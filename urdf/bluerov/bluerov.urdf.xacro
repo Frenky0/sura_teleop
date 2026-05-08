@@ -1,0 +1,246 @@
+<?xml version="1.0"?>
+<robot name="bluerov2" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="robot_namespace" default="bluerov2"/>
+  <xacro:arg name="environment" default="real"/>
+  <xacro:arg name="lookup_csv" default="config/t200_lookup.csv"/>
+  <xacro:arg name="stonefish_topic" default="/bluerov2/controller/thruster_setpoints_sim"/>
+  <xacro:arg name="pwm_channels" default="0,1,2,3,4,5,6,7"/>
+
+  <xacro:property name="robot_namespace" value="$(arg robot_namespace)"/>
+  <xacro:property name="robot_prefix" value="${robot_namespace}/"/>
+
+  <xacro:macro name="thruster_mount" params="link_name joint_name xyz rpy">
+    <link name="${robot_prefix}${link_name}"/>
+
+    <joint name="${robot_prefix}${joint_name}" type="fixed">
+      <parent link="${robot_prefix}base_link"/>
+      <child link="${robot_prefix}${link_name}"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="ros2_control_thruster_joint" params="joint_name inverted">
+    <joint name="${robot_prefix}${joint_name}">
+      <command_interface name="effort"/>
+      <state_interface name="effort"/>
+      <param name="inverted">${inverted}</param>
+    </joint>
+  </xacro:macro>
+
+  <link name="${robot_prefix}base_link">
+    <visual>
+      <geometry>
+        <mesh
+          filename="package://bluerov_description/urdf/bluerov/meshes/bluerov2_heavy/bluerov2_centrado.dae"
+          scale="0.025 0.025 0.025"/>
+      </geometry>
+      <origin rpy="3.1416 0 0" xyz="0 0 0"/>
+    </visual>
+  </link>
+
+  <link name="${robot_prefix}imu_link"/>
+
+  <joint name="${robot_prefix}imu_joint" type="fixed">
+    <parent link="${robot_prefix}base_link"/>
+    <child link="${robot_prefix}imu_link"/>
+    <origin xyz="0.05 0.0 -0.05" rpy="-1.57 0 0"/>
+  </joint>
+
+  <link name="${robot_prefix}dvl_link"/>
+
+  <joint name="${robot_prefix}dvl_joint" type="fixed">
+    <parent link="${robot_prefix}base_link"/>
+    <child link="${robot_prefix}dvl_link"/>
+    <origin xyz="0.0 -0.23 -0.05" rpy="0 0 0"/>
+  </joint>
+
+  <!-- camera down -->
+  <link name="${robot_prefix}camera_down"/>
+
+  <joint name="${robot_prefix}camera_down_joint" type="fixed">
+    <parent link="${robot_prefix}base_link"/>
+    <child link="${robot_prefix}camera_down"/>
+    <origin xyz="0.006 0.13 0.143" rpy="0 0 0.0"/>
+  </joint>
+
+  <link name="${robot_prefix}camera_down/optical_frame"/>
+
+  <joint name="${robot_prefix}camera_down_optical_frame_joint" type="fixed">
+    <parent link="${robot_prefix}camera_down"/>
+    <child link="${robot_prefix}camera_down/optical_frame"/>
+    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 1.57"/>
+  </joint>
+
+  <!-- camera front -->
+  <link name="${robot_prefix}camera_front"/>
+
+  <joint name="${robot_prefix}camera_front_joint" type="fixed">
+    <parent link="${robot_prefix}base_link"/>
+    <child link="${robot_prefix}camera_front"/>
+    <origin xyz="0.17 -0.005 -0.035" rpy="0.0 0.0 0.0"/>
+  </joint>
+
+  <link name="${robot_prefix}camera_front/optical_frame"/>
+
+  <joint name="${robot_prefix}camera_front_optical_frame_joint" type="fixed">
+    <parent link="${robot_prefix}camera_front"/>
+    <child link="${robot_prefix}camera_front/optical_frame"/>
+    <origin xyz="0.0 0.0 0.0" rpy="-1.57 3.14 -1.57"/>
+  </joint>
+
+  <!-- camera right -->
+  <link name="${robot_prefix}camera_right"/>
+
+  <joint name="${robot_prefix}camera_right_joint" type="fixed">
+    <parent link="${robot_prefix}base_link"/>
+    <child link="${robot_prefix}camera_right"/>
+    <origin xyz="0.14 0.007 -0.1" rpy="0.0 0.0 0.0"/>
+  </joint>
+
+  <link name="${robot_prefix}camera_right/optical_frame"/>
+
+  <joint name="${robot_prefix}camera_right_optical_frame_joint" type="fixed">
+    <parent link="${robot_prefix}camera_right"/>
+    <child link="${robot_prefix}camera_right/optical_frame"/>
+    <origin xyz="0.0 0.0 0.0" rpy="-1.57 3.14 -1.57"/>
+  </joint>
+
+  <!-- camera left -->
+  <link name="${robot_prefix}camera_left"/>
+
+  <joint name="${robot_prefix}camera_left_joint" type="fixed">
+    <parent link="${robot_prefix}base_link"/>
+    <child link="${robot_prefix}camera_left"/>
+    <origin xyz="0.14 -0.06 -0.1" rpy="0.0 0.0 0.0"/>
+  </joint>
+
+  <link name="${robot_prefix}camera_left/optical_frame"/>
+
+  <joint name="${robot_prefix}camera_left_optical_frame_joint" type="fixed">
+    <parent link="${robot_prefix}camera_left"/>
+    <child link="${robot_prefix}camera_left/optical_frame"/>
+    <origin xyz="0.0 0.0 0.0" rpy="-1.57 3.14 -1.57"/>
+  </joint>
+
+  <xacro:thruster_mount
+    link_name="Thruster_R_FORWARD_FRONT"
+    joint_name="Thruster_R_FORWARD_FRONT"
+    xyz="0.145737 0.091717 0.04783"
+    rpy="0.0 0.0 -0.7853"/>
+
+  <xacro:thruster_mount
+    link_name="Thruster_L_FORWARD_FRONT"
+    joint_name="Thruster_L_FORWARD_FRONT"
+    xyz="0.145737 -0.09814 0.04783"
+    rpy="0.0 0.0 0.7853"/>
+
+  <xacro:thruster_mount
+    link_name="Thruster_R_FORWARD_REAR"
+    joint_name="Thruster_R_FORWARD_REAR"
+    xyz="-0.145419 0.091717 0.04783"
+    rpy="0.0 0.0 -2.35619"/>
+
+  <xacro:thruster_mount
+    link_name="Thruster_L_FORWARD_REAR"
+    joint_name="Thruster_L_FORWARD_REAR"
+    xyz="-0.145419 -0.09814 0.04783"
+    rpy="0.0 0.0 2.35619"/>
+
+  <xacro:thruster_mount
+    link_name="Thruster_R_UP_FRONT"
+    joint_name="Thruster_R_UP_FRONT"
+    xyz="0.124709 0.209 -0.013231"
+    rpy="1.57 1.57 0.0"/>
+
+  <xacro:thruster_mount
+    link_name="Thruster_L_UP_FRONT"
+    joint_name="Thruster_L_UP_FRONT"
+    xyz="0.124709 -0.220356 -0.013231"
+    rpy="1.57 1.57 0.0"/>
+
+  <xacro:thruster_mount
+    link_name="Thruster_R_UP_REAR"
+    joint_name="Thruster_R_UP_REAR"
+    xyz="-0.112476 0.209 -0.013231"
+    rpy="1.57 1.57 0.0"/>
+
+  <xacro:thruster_mount
+    link_name="Thruster_L_UP_REAR"
+    joint_name="Thruster_L_UP_REAR"
+    xyz="-0.112476 -0.220356 -0.013231"
+    rpy="1.57 1.57 0.0"/>
+
+  <ros2_control name="cirtesub_thrusters" type="system">
+    <hardware>
+      <plugin>sura_hardware_interface/ThrustersSystem</plugin>
+      <param name="environment">$(arg environment)</param>
+      <param name="lookup_csv">$(arg lookup_csv)</param>
+      <param name="stonefish_topic">$(arg stonefish_topic)</param>
+      <param name="pwm_channels">$(arg pwm_channels)</param>
+    </hardware>
+
+    <xacro:ros2_control_thruster_joint joint_name="Thruster_R_FORWARD_FRONT" inverted="false"/>
+    <xacro:ros2_control_thruster_joint joint_name="Thruster_L_FORWARD_FRONT" inverted="false"/>
+    <xacro:ros2_control_thruster_joint joint_name="Thruster_R_FORWARD_REAR" inverted="true"/>
+    <xacro:ros2_control_thruster_joint joint_name="Thruster_L_FORWARD_REAR" inverted="true"/>
+    <xacro:ros2_control_thruster_joint joint_name="Thruster_R_UP_FRONT" inverted="false"/>
+    <xacro:ros2_control_thruster_joint joint_name="Thruster_L_UP_FRONT" inverted="true"/>
+    <xacro:ros2_control_thruster_joint joint_name="Thruster_R_UP_REAR" inverted="true"/>
+    <xacro:ros2_control_thruster_joint joint_name="Thruster_L_UP_REAR" inverted="false"/>
+  </ros2_control>
+
+  <ros2_control name="SensorsSystem" type="system">
+    <hardware>
+      <plugin>sura_hardware_interface/SensorsSystem</plugin>
+
+      <param name="dvl_ip">192.168.1.236</param>
+      <param name="dvl_listen_port">27000</param>
+      <param name="dvl_command_port">50000</param>
+      <param name="dvl_min_confidence">50.0</param>
+      <param name="dvl_timeout_s">1.0</param>
+    </hardware>
+
+    <sensor name="imu_sensor">
+      <state_interface name="orientation.x"/>
+      <state_interface name="orientation.y"/>
+      <state_interface name="orientation.z"/>
+      <state_interface name="orientation.w"/>
+      <state_interface name="angular_velocity.x"/>
+      <state_interface name="angular_velocity.y"/>
+      <state_interface name="angular_velocity.z"/>
+      <state_interface name="linear_acceleration.x"/>
+      <state_interface name="linear_acceleration.y"/>
+      <state_interface name="linear_acceleration.z"/>
+    </sensor>
+
+    <sensor name="magnetometer_sensor">
+      <state_interface name="magnetic_field.x"/>
+      <state_interface name="magnetic_field.y"/>
+      <state_interface name="magnetic_field.z"/>
+    </sensor>
+
+    <sensor name="pressure_sensor">
+      <state_interface name="fluid_pressure"/>
+    </sensor>
+
+    <sensor name="dvl_sensor">
+      <state_interface name="linear_velocity.x"/>
+      <state_interface name="linear_velocity.y"/>
+      <state_interface name="linear_velocity.z"/>
+
+      <state_interface name="angular_velocity.x"/>
+      <state_interface name="angular_velocity.y"/>
+      <state_interface name="angular_velocity.z"/>
+
+      <state_interface name="distance_z"/>
+      <state_interface name="confidence"/>
+
+      <state_interface name="gps.latitude"/>
+      <state_interface name="gps.longitude"/>
+      <state_interface name="gps.altitude"/>
+      <state_interface name="gps.valid"/>
+    </sensor>
+  </ros2_control>
+
+</robot>
