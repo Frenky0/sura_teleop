@@ -1,11 +1,12 @@
 <?xml version="1.0"?>
-<robot name="bluerov2" xmlns:xacro="http://www.ros.org/wiki/xacro">
+<robot name="bluerov" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <xacro:arg name="robot_namespace" default="bluerov2"/>
+  <xacro:arg name="robot_namespace" default="bluerov"/>
   <xacro:arg name="environment" default="real"/>
   <xacro:arg name="lookup_csv" default="config/t200_lookup.csv"/>
-  <xacro:arg name="stonefish_topic" default="/bluerov2/controller/thruster_setpoints_sim"/>
+  <xacro:arg name="stonefish_topic" default="/bluerov/controller/thruster_setpoints_sim"/>
   <xacro:arg name="pwm_channels" default="0,1,2,3,4,5,6,7"/>
+  <xacro:arg name="pressure_offset_pa" default="101325.0"/>
 
   <xacro:property name="robot_namespace" value="$(arg robot_namespace)"/>
   <xacro:property name="robot_prefix" value="${robot_namespace}/"/>
@@ -16,6 +17,16 @@
     <joint name="${robot_prefix}${joint_name}" type="fixed">
       <parent link="${robot_prefix}base_link"/>
       <child link="${robot_prefix}${link_name}"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="sensor_mount" params="link_name joint_name xyz rpy">
+    <link name="${link_name}"/>
+
+    <joint name="${joint_name}" type="fixed">
+      <parent link="${robot_prefix}base_link"/>
+      <child link="${link_name}"/>
       <origin xyz="${xyz}" rpy="${rpy}"/>
     </joint>
   </xacro:macro>
@@ -39,21 +50,11 @@
     </visual>
   </link>
 
-  <link name="${robot_prefix}imu_link"/>
-
-  <joint name="${robot_prefix}imu_joint" type="fixed">
-    <parent link="${robot_prefix}base_link"/>
-    <child link="${robot_prefix}imu_link"/>
-    <origin xyz="0.05 0.0 -0.05" rpy="-1.57 0 0"/>
-  </joint>
-
-  <link name="${robot_prefix}dvl_link"/>
-
-  <joint name="${robot_prefix}dvl_joint" type="fixed">
-    <parent link="${robot_prefix}base_link"/>
-    <child link="${robot_prefix}dvl_link"/>
-    <origin xyz="0.0 -0.23 -0.05" rpy="0 0 0"/>
-  </joint>
+  <xacro:sensor_mount
+    link_name="${robot_prefix}imu_link"
+    joint_name="${robot_prefix}imu_joint"
+    xyz="0.05 0.0 -0.05"
+    rpy="-1.57 0 0"/>
 
   <!-- camera down -->
   <link name="${robot_prefix}camera_down"/>
@@ -171,7 +172,7 @@
     xyz="-0.112476 -0.220356 -0.013231"
     rpy="1.57 1.57 0.0"/>
 
-  <ros2_control name="cirtesub_thrusters" type="system">
+  <ros2_control name="${robot_namespace}_thrusters" type="system">
     <hardware>
       <plugin>sura_hardware_interface/ThrustersSystem</plugin>
       <param name="environment">$(arg environment)</param>
@@ -190,57 +191,71 @@
     <xacro:ros2_control_thruster_joint joint_name="Thruster_L_UP_REAR" inverted="false"/>
   </ros2_control>
 
-  <ros2_control name="SensorsSystem" type="system">
-    <hardware>
-      <plugin>sura_hardware_interface/SensorsSystem</plugin>
+  
+  <xacro:macro name="ros2_control_sensor_system">
+    <ros2_control name="${robot_namespace}_sensors" type="system">
+      <hardware>
+        <plugin>sura_hardware_interface/SensorsSystem</plugin>
+        <param name="environment">$(arg environment)</param>
+        <param name="robot_namespace">${robot_namespace}</param>
+        <param name="sim_imu_topic">/${robot_namespace}/stonefish/sensors/imu</param>
+        <param name="sim_magnetometer_topic">/${robot_namespace}/stonefish/sensors/magnetometer</param>
+        <param name="sim_pressure_topic">/${robot_namespace}/stonefish/sensors/pressure</param>
+        <param name="sim_dvl_topic">/${robot_namespace}/stonefish/sensors/dvl</param>
+        <param name="sim_dvl_altitude_topic">/${robot_namespace}/stonefish/sensors/dvl/altitude</param>
+        <param name="sim_gps_topic">/${robot_namespace}/stonefish/sensors/gps</param>
+        <param name="pressure_offset_pa">$(arg pressure_offset_pa)</param>
+        <param name="pressure_read_rate_hz">100.0</param>
+        <param name="dvl_read_rate_hz">50.0</param>
+        <param name="battery_read_rate_hz">1.0</param>
+      </hardware>
 
-      <param name="dvl_ip">192.168.1.236</param>
-      <param name="dvl_listen_port">27000</param>
-      <param name="dvl_command_port">50000</param>
-      <param name="dvl_min_confidence">50.0</param>
-      <param name="dvl_timeout_s">1.0</param>
-    </hardware>
+      <sensor name="imu_sensor">
+        <state_interface name="orientation.x"/>
+        <state_interface name="orientation.y"/>
+        <state_interface name="orientation.z"/>
+        <state_interface name="orientation.w"/>
+        <state_interface name="angular_velocity.x"/>
+        <state_interface name="angular_velocity.y"/>
+        <state_interface name="angular_velocity.z"/>
+        <state_interface name="linear_acceleration.x"/>
+        <state_interface name="linear_acceleration.y"/>
+        <state_interface name="linear_acceleration.z"/>
+      </sensor>
 
-    <sensor name="imu_sensor">
-      <state_interface name="orientation.x"/>
-      <state_interface name="orientation.y"/>
-      <state_interface name="orientation.z"/>
-      <state_interface name="orientation.w"/>
-      <state_interface name="angular_velocity.x"/>
-      <state_interface name="angular_velocity.y"/>
-      <state_interface name="angular_velocity.z"/>
-      <state_interface name="linear_acceleration.x"/>
-      <state_interface name="linear_acceleration.y"/>
-      <state_interface name="linear_acceleration.z"/>
-    </sensor>
+      <sensor name="magnetometer_sensor">
+        <state_interface name="magnetic_field.x"/>
+        <state_interface name="magnetic_field.y"/>
+        <state_interface name="magnetic_field.z"/>
+      </sensor>
 
-    <sensor name="magnetometer_sensor">
-      <state_interface name="magnetic_field.x"/>
-      <state_interface name="magnetic_field.y"/>
-      <state_interface name="magnetic_field.z"/>
-    </sensor>
+      <sensor name="pressure_sensor">
+        <state_interface name="fluid_pressure"/>
+      </sensor>
 
-    <sensor name="pressure_sensor">
-      <state_interface name="fluid_pressure"/>
-    </sensor>
+      <sensor name="battery_sensor">
+        <state_interface name="voltage"/>
+        <state_interface name="current"/>
+        <state_interface name="present"/>
+      </sensor>
 
-    <sensor name="dvl_sensor">
-      <state_interface name="linear_velocity.x"/>
-      <state_interface name="linear_velocity.y"/>
-      <state_interface name="linear_velocity.z"/>
+      <sensor name="dvl_sensor">
+        <state_interface name="linear_velocity.x"/>
+        <state_interface name="linear_velocity.y"/>
+        <state_interface name="linear_velocity.z"/>
+        <state_interface name="angular_velocity.x"/>
+        <state_interface name="angular_velocity.y"/>
+        <state_interface name="angular_velocity.z"/>
+        <state_interface name="distance_z"/>
+        <state_interface name="confidence"/>
+        <state_interface name="gps.latitude"/>
+        <state_interface name="gps.longitude"/>
+        <state_interface name="gps.altitude"/>
+        <state_interface name="gps.valid"/>
+      </sensor>
+    </ros2_control>
+  </xacro:macro>
 
-      <state_interface name="angular_velocity.x"/>
-      <state_interface name="angular_velocity.y"/>
-      <state_interface name="angular_velocity.z"/>
-
-      <state_interface name="distance_z"/>
-      <state_interface name="confidence"/>
-
-      <state_interface name="gps.latitude"/>
-      <state_interface name="gps.longitude"/>
-      <state_interface name="gps.altitude"/>
-      <state_interface name="gps.valid"/>
-    </sensor>
-  </ros2_control>
+  <xacro:ros2_control_sensor_system/>
 
 </robot>

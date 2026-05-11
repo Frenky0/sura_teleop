@@ -12,14 +12,10 @@ find_package(xacro REQUIRED)
 find_package(robot_state_publisher REQUIRED)
 
 install(
-  DIRECTORY config urdf launch resources scripts
+  DIRECTORY config urdf launch resources
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(PROGRAMS
-  scripts/odom2tf.py
-  DESTINATION lib/${PROJECT_NAME}
-)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

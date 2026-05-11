@@ -1,0 +1,268 @@
+/bluerov/controller/controller_manager:
+  ros__parameters:
+    update_rate: 200
+
+    hardware_components_initial_state:
+      inactive:
+        - ThrustersSystem
+        - SensorsSystem
+
+    thruster_test_controller:
+      type: forward_command_controller/ForwardCommandController
+
+    body_force:
+      type: cirtesub_controllers/BodyForceController
+    
+    body_velocity:
+      type: cirtesub_controllers/BodyVelocityController
+
+    position_hold:
+      type: cirtesub_controllers/PositionHoldController
+
+    stabilize:
+      type: cirtesub_controllers/StabilizeController
+
+    depth_hold:
+      type: cirtesub_controllers/DepthHoldController
+
+    imu_broadcaster:
+      type: imu_sensor_broadcaster/IMUSensorBroadcaster
+
+    magnetometer_broadcaster:
+      type: sura_sensors/MagnetometerBroadcaster
+
+    pressure_broadcaster:
+      type: sura_sensors/PressureBroadcaster
+
+    dvl75_velocity_broadcaster:
+      type: sura_sensors/DvlVelBroadcaster
+
+    dvl75_altitude_broadcaster:
+      type: sura_sensors/Dvl75AltitudeBroadcaster
+
+    dvl75_gps_broadcaster:
+      type: sura_sensors/Dvl75GpsBroadcaster
+
+    battery_broadcaster:
+      type: sura_sensors/BatteryBroadcaster
+
+
+# TODO: estos nombres de los joints tiene que leerlos del xacro de los que son tipo thrusters y en el orden que toca 
+/bluerov/controller/thruster_test_controller:
+  ros__parameters:
+    joints:
+      - bluerov/Thruster_R_FORWARD_FRONT
+      - bluerov/Thruster_L_FORWARD_FRONT
+      - bluerov/Thruster_R_FORWARD_REAR
+      - bluerov/Thruster_L_FORWARD_REAR
+      - bluerov/Thruster_R_UP_FRONT
+      - bluerov/Thruster_L_UP_FRONT
+      - bluerov/Thruster_R_UP_REAR
+      - bluerov/Thruster_L_UP_REAR
+    interface_name: effort
+
+/bluerov/controller/body_force:
+  ros__parameters:
+    input_topic: /bluerov/controller/body_force/command
+
+/bluerov/controller/body_velocity:
+  ros__parameters:
+    setpoint_topic: /bluerov/controller/body_velocity/setpoint
+    navigator_topic: /bluerov/navigator/navigation
+    feedforward_topic: /bluerov/controller/depth_hold/feedforward
+    body_force_controller_name: body_force
+
+    kp_x: 100.0
+    ki_x: 50.0
+    kd_x: 0.0
+    antiwindup_x: 10.0
+
+    kp_y: 100.0
+    ki_y: 50.0
+    kd_y: 0.0
+    antiwindup_y: 10.0
+
+    kp_z: 800.0
+    ki_z: 400.0
+    kd_z: 0.0
+    antiwindup_z: 10.0
+
+    kp_roll: 50.0
+    ki_roll: 50.0
+    kd_roll: 0.0
+    antiwindup_roll: 10.0
+
+    kp_pitch: 50.0
+    ki_pitch: 50.0
+    kd_pitch: 0.0
+    antiwindup_pitch: 10.0
+
+    kp_yaw: 15.0
+    ki_yaw: 8.0
+    kd_yaw: 0.0
+    antiwindup_yaw: 10.0
+
+/bluerov/controller/position_hold:
+  ros__parameters:
+    setpoint_topic: /bluerov/controller/position_hold/setpoint
+    feedforward_topic: /bluerov/controller/position_hold/feedforward
+    navigator_topic: /bluerov/navigator/navigation
+    body_velocity_controller_name: body_velocity
+    setpoint_frame_id: world_ned
+
+    kp_x: 1.0
+    ki_x: 0.0
+    kd_x: 0.0
+    antiwindup_x: 1.0
+
+    kp_y: 1.0
+    ki_y: 0.0
+    kd_y: 0.0
+    antiwindup_y: 1.0
+
+    kp_z: 1.0
+    ki_z: 0.0
+    kd_z: 0.0
+    antiwindup_z: 1.0
+
+    kp_roll: 1.0
+    ki_roll: 0.0
+    kd_roll: 0.0
+    antiwindup_roll: 1.0
+
+    kp_pitch: 1.0
+    ki_pitch: 0.0
+    kd_pitch: 0.0
+    antiwindup_pitch: 1.0
+
+    kp_yaw: 1.0
+    ki_yaw: 0.0
+    kd_yaw: 0.0
+    antiwindup_yaw: 1.0
+
+    linear_feedforward_threshold: 0.001
+    angular_feedforward_threshold: 0.001
+    feedforward_timeout: 0.25
+
+/bluerov/controller/stabilize:
+  ros__parameters:
+    feedforward_topic: /bluerov/controller/stabilize/feedforward
+    navigator_topic: /bluerov/navigator/navigation
+    body_force_controller_name: body_force
+    enable_roll_pitch_service_name: /bluerov/controller/stabilize/enable_roll_pitch
+    disable_roll_pitch_service_name: /bluerov/controller/stabilize/disable_roll_pitch
+    allow_roll_pitch: false
+    feedforward_gain_x: 1.0
+    feedforward_gain_y: 1.0
+    feedforward_gain_z: 1.0
+    feedforward_gain_roll: 1.0
+    feedforward_gain_pitch: 1.0
+    feedforward_gain_yaw: 1.0
+
+    kp_roll: 6.0
+    ki_roll: 0.0
+    kd_roll: 2.0
+
+    kp_pitch: 6.0
+    ki_pitch: 0.0
+    kd_pitch: 2.0
+
+    kp_yaw: 8.0
+    ki_yaw: 0.0
+    kd_yaw: 1.5
+
+    yaw_command_threshold: 0.001
+    roll_command_threshold: 0.001
+    pitch_command_threshold: 0.001
+
+/bluerov/controller/depth_hold:
+  ros__parameters:
+    feedforward_topic: /bluerov/controller/depth_hold/feedforward
+    navigator_topic: /bluerov/navigator/navigation
+    setpoint_topic: /bluerov/controller/depth_hold/set_point
+    body_force_controller_name: body_force
+    enable_roll_pitch_service_name: /bluerov/controller/depth_hold/enable_roll_pitch
+    disable_roll_pitch_service_name: /bluerov/controller/depth_hold/disable_roll_pitch
+    allow_roll_pitch: false
+    debug:
+      enabled: true
+      depth_topic: /bluerov/controller/depth_hold/debug
+      depth_decimation: 10
+    feedforward_gain_x: 1.0
+    feedforward_gain_y: 1.0
+    feedforward_gain_z: 1.0
+    feedforward_gain_roll: 1.0
+    feedforward_gain_pitch: 1.0
+    feedforward_gain_yaw: 1.0
+
+    kp_roll: 6.0
+    ki_roll: 0.0
+    kd_roll: 2.0
+
+    kp_pitch: 6.0
+    ki_pitch: 0.0
+    kd_pitch: 2.0
+
+    kp_yaw: 8.0
+    ki_yaw: 0.0
+    kd_yaw: 1.5
+
+
+    kp_depth: 40.0
+    ki_depth: 3.0
+    kd_depth: 9.0
+
+    command_threshold: 0.001
+    depth_command_threshold: 0.001
+
+/bluerov/controller/imu_broadcaster:
+  ros__parameters:
+    sensor_name: imu_sensor
+    frame_id: bluerov2/imu_link
+    update_rate: 200
+
+/bluerov/controller/magnetometer_broadcaster:
+  ros__parameters:
+    sensor_name: magnetometer_sensor
+    frame_id: bluerov/imu_link
+    topic_name: /bluerov/controller/magnetometer_broadcaster/mag
+    update_rate: 200
+
+/bluerov/controller/pressure_broadcaster:
+  ros__parameters:
+    sensor_name: pressure_sensor
+    frame_id: bluerov/base_link
+    topic_name: /bluerov/sensors/pressure
+    pressure_variance: 0.0
+    update_rate: 100
+
+/bluerov/controller/dvl75_velocity_broadcaster:
+  ros__parameters:
+    sensor_name: dvl_sensor
+    frame_id: bluerov/dvl_link
+    topic_name: /bluerov/sensors/dvl/twist
+    update_rate: 50
+    min_linear_velocity_covariance: 0.01
+    max_linear_velocity_covariance: 999.0
+    angular_velocity_covariance: 99999.0
+
+/bluerov/controller/dvl75_altitude_broadcaster:
+  ros__parameters:
+    sensor_name: dvl_sensor
+    frame_id: bluerov/dvl_link
+    topic_name: /bluerov/sensors/dvl/altitude
+    update_rate: 50
+
+/bluerov/controller/dvl75_gps_broadcaster:
+  ros__parameters:
+    sensor_name: dvl_sensor
+    frame_id: bluerov/dvl_link
+    topic_name: /bluerov/sensors/gps
+    update_rate: 50
+    position_covariance: 0.0
+
+/bluerov/controller/battery_broadcaster:
+  ros__parameters:
+    sensor_name: battery_sensor
+    topic_name: /bluerov/battery/status
+    update_rate: 1
