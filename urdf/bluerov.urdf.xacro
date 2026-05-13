@@ -6,7 +6,7 @@
   <xacro:arg name="lookup_csv" default="config/t200_lookup.csv"/>
   <xacro:arg name="stonefish_topic" default="/bluerov/controller/thruster_setpoints_sim"/>
   <xacro:arg name="pwm_channels" default="0,1,2,3,4,5,6,7"/>
-  <xacro:arg name="pressure_offset_pa" default="101325.0"/>
+  <xacro:arg name="pressure_offset_pa" default="0.0"/>
 
   <xacro:property name="robot_namespace" value="$(arg robot_namespace)"/>
   <xacro:property name="robot_prefix" value="${robot_namespace}/"/>
@@ -56,19 +56,25 @@
     xyz="0.05 0.0 -0.05"
     rpy="-1.57 0 0"/>
 
+  <xacro:sensor_mount
+    link_name="${robot_prefix}dvl_link"
+    joint_name="${robot_prefix}dvl_joint"
+    xyz="0.0 -0.23 -0.05"
+    rpy="0.0 0.0 0.0"/>
+
   <!-- camera down -->
-  <link name="${robot_prefix}camera_down"/>
+  <link name="${robot_prefix}camera_down/camera"/>
 
   <joint name="${robot_prefix}camera_down_joint" type="fixed">
     <parent link="${robot_prefix}base_link"/>
-    <child link="${robot_prefix}camera_down"/>
+    <child link="${robot_prefix}camera_down/camera"/>
     <origin xyz="0.006 0.13 0.143" rpy="0 0 0.0"/>
   </joint>
 
   <link name="${robot_prefix}camera_down/optical_frame"/>
 
   <joint name="${robot_prefix}camera_down_optical_frame_joint" type="fixed">
-    <parent link="${robot_prefix}camera_down"/>
+    <parent link="${robot_prefix}camera_down/camera"/>
     <child link="${robot_prefix}camera_down/optical_frame"/>
     <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 1.57"/>
   </joint>
@@ -205,9 +211,10 @@
         <param name="sim_dvl_altitude_topic">/${robot_namespace}/stonefish/sensors/dvl/altitude</param>
         <param name="sim_gps_topic">/${robot_namespace}/stonefish/sensors/gps</param>
         <param name="pressure_offset_pa">$(arg pressure_offset_pa)</param>
-        <param name="pressure_read_rate_hz">100.0</param>
-        <param name="dvl_read_rate_hz">50.0</param>
+        <param name="pressure_read_rate_hz">200.0</param>
+        <param name="dvl_read_rate_hz">20.0</param>
         <param name="battery_read_rate_hz">1.0</param>
+        <param name="leak_read_rate_hz">1.0</param>
       </hardware>
 
       <sensor name="imu_sensor">
@@ -237,6 +244,10 @@
         <state_interface name="voltage"/>
         <state_interface name="current"/>
         <state_interface name="present"/>
+      </sensor>
+
+      <sensor name="leak_sensor">
+        <state_interface name="leak"/>
       </sensor>
 
       <sensor name="dvl_sensor">

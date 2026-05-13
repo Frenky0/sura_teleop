@@ -46,6 +46,9 @@
     battery_broadcaster:
       type: sura_sensors/BatteryBroadcaster
 
+    leak_broadcaster:
+      type: sura_sensors/LeakBroadcaster
+
 
 # TODO: estos nombres de los joints tiene que leerlos del xacro de los que son tipo thrusters y en el orden que toca 
 /bluerov/controller/thruster_test_controller:
@@ -159,17 +162,17 @@
     feedforward_gain_pitch: 1.0
     feedforward_gain_yaw: 1.0
 
-    kp_roll: 6.0
-    ki_roll: 0.0
-    kd_roll: 2.0
+    kp_roll: 4.0
+    ki_roll: 1.0
+    kd_roll: 0.0
 
-    kp_pitch: 6.0
-    ki_pitch: 0.0
-    kd_pitch: 2.0
+    kp_pitch: 4.0
+    ki_pitch: 1.0
+    kd_pitch: 0.0
 
-    kp_yaw: 8.0
-    ki_yaw: 0.0
-    kd_yaw: 1.5
+    kp_yaw: 4.0
+    ki_yaw: 1.0
+    kd_yaw: 0.0
 
     yaw_command_threshold: 0.001
     roll_command_threshold: 0.001
@@ -195,17 +198,17 @@
     feedforward_gain_pitch: 1.0
     feedforward_gain_yaw: 1.0
 
-    kp_roll: 6.0
-    ki_roll: 0.0
-    kd_roll: 2.0
+    kp_roll: 4.0
+    ki_roll: 1.0
+    kd_roll: 0.0
 
-    kp_pitch: 6.0
-    ki_pitch: 0.0
-    kd_pitch: 2.0
+    kp_pitch: 4.0
+    ki_pitch: 1.0
+    kd_pitch: 0.0
 
     kp_yaw: 8.0
-    ki_yaw: 0.0
-    kd_yaw: 1.5
+    ki_yaw: 1.0
+    kd_yaw: 0.0
 
 
     kp_depth: 40.0
@@ -218,7 +221,7 @@
 /bluerov/controller/imu_broadcaster:
   ros__parameters:
     sensor_name: imu_sensor
-    frame_id: bluerov2/imu_link
+    frame_id: bluerov/imu_link
     update_rate: 200
 
 /bluerov/controller/magnetometer_broadcaster:
@@ -265,4 +268,10 @@
   ros__parameters:
     sensor_name: battery_sensor
     topic_name: /bluerov/battery/status
+    update_rate: 1
+
+/bluerov/controller/leak_broadcaster:
+  ros__parameters:
+    sensor_name: leak_sensor
+    topic_name: /bluerov/leak_sensors
     update_rate: 1

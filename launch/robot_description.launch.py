@@ -11,7 +11,6 @@ def launch_setup(context, *args, **kwargs):
     robot_namespace = LaunchConfiguration("robot_namespace").perform(context).strip("/")
     environment = LaunchConfiguration("environment").perform(context)
     pwm_channels = LaunchConfiguration("pwm_channels").perform(context)
-    pressure_offset_pa = LaunchConfiguration("pressure_offset_pa").perform(context)
 
     if environment not in ("sim", "real"):
         raise RuntimeError(
@@ -47,8 +46,6 @@ def launch_setup(context, *args, **kwargs):
         "/controller/thruster_setpoints_sim",
         " pwm_channels:=",
         pwm_channels,
-        " pressure_offset_pa:=",
-        pressure_offset_pa,
     ]
 
     robot_description = Command(xacro_command)
@@ -79,7 +76,6 @@ def generate_launch_description():
             DeclareLaunchArgument("robot_namespace", default_value="bluerov2"),
             DeclareLaunchArgument("environment", default_value="real"),
             DeclareLaunchArgument("pwm_channels", default_value="0,1,2,3,4,5,6,7"),
-            DeclareLaunchArgument("pressure_offset_pa", default_value="101325.0"),
             OpaqueFunction(function=launch_setup),
         ]
     )
