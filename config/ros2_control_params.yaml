@@ -6,6 +6,7 @@
       inactive:
         - ThrustersSystem
         - SensorsSystem
+        - ServoActuatorSystem
 
     thruster_test_controller:
       type: forward_command_controller/ForwardCommandController
@@ -34,21 +35,17 @@
     pressure_broadcaster:
       type: sura_sensors/PressureBroadcaster
 
-    dvl75_velocity_broadcaster:
-      type: sura_sensors/DvlVelBroadcaster
-
-    dvl75_altitude_broadcaster:
-      type: sura_sensors/Dvl75AltitudeBroadcaster
-
-    dvl75_gps_broadcaster:
-      type: sura_sensors/Dvl75GpsBroadcaster
-
     battery_broadcaster:
       type: sura_sensors/BatteryBroadcaster
+    
+    newton_gripper_controller:
+      type: position_controllers/JointGroupPositionController
 
-    leak_broadcaster:
-      type: sura_sensors/LeakBroadcaster
+    servo_zip_controller:
+      type: position_controllers/JointGroupPositionController
 
+    servo_camera_controller:
+      type: position_controllers/JointGroupPositionController
 
 # TODO: estos nombres de los joints tiene que leerlos del xacro de los que son tipo thrusters y en el orden que toca 
 /bluerov/controller/thruster_test_controller:
@@ -239,39 +236,26 @@
     pressure_variance: 0.0
     update_rate: 100
 
-/bluerov/controller/dvl75_velocity_broadcaster:
-  ros__parameters:
-    sensor_name: dvl_sensor
-    frame_id: bluerov/dvl_link
-    topic_name: /bluerov/sensors/dvl/twist
-    update_rate: 50
-    min_linear_velocity_covariance: 0.01
-    max_linear_velocity_covariance: 999.0
-    angular_velocity_covariance: 99999.0
-
-/bluerov/controller/dvl75_altitude_broadcaster:
-  ros__parameters:
-    sensor_name: dvl_sensor
-    frame_id: bluerov/dvl_link
-    topic_name: /bluerov/sensors/dvl/altitude
-    update_rate: 50
-
-/bluerov/controller/dvl75_gps_broadcaster:
-  ros__parameters:
-    sensor_name: dvl_sensor
-    frame_id: bluerov/dvl_link
-    topic_name: /bluerov/sensors/gps
-    update_rate: 50
-    position_covariance: 0.0
-
 /bluerov/controller/battery_broadcaster:
   ros__parameters:
     sensor_name: battery_sensor
     topic_name: /bluerov/battery/status
     update_rate: 1
 
-/bluerov/controller/leak_broadcaster:
+/bluerov/controller/newton_gripper_controller:
   ros__parameters:
-    sensor_name: leak_sensor
-    topic_name: /bluerov/leak_sensors
-    update_rate: 1
+    joints:
+      - bluerov/newton_gripper_joint
+    interface_name: position
+
+/bluerov/controller/servo_zip_controller:
+  ros__parameters:
+    joints:
+      - bluerov/servo_zip_joint
+    interface_name: position
+  
+/bluerov/controller/servo_camera_controller:
+  ros__parameters:
+    joints:
+      - bluerov/servo_camera_joint
+    interface_name: position

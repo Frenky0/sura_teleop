@@ -1,3 +1,4 @@
+from multiprocessing import context
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -5,12 +6,16 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+
 
 
 def launch_setup(context, *args, **kwargs):
     robot_namespace = LaunchConfiguration("robot_namespace").perform(context).strip("/")
     environment = LaunchConfiguration("environment").perform(context)
     pwm_channels = LaunchConfiguration("pwm_channels").perform(context)
+    servo_pwm_channels = LaunchConfiguration("servo_pwm_channels").perform(context)
+    servo_sim_topic = LaunchConfiguration("servo_sim_topic").perform(context)
 
     if environment not in ("sim", "real"):
         raise RuntimeError(
@@ -31,7 +36,7 @@ def launch_setup(context, *args, **kwargs):
         "config",
         "t200_lookup.csv",
     )
-
+    
     xacro_command = [
         "xacro ",
         xacro_file,
@@ -46,10 +51,15 @@ def launch_setup(context, *args, **kwargs):
         "/controller/thruster_setpoints_sim",
         " pwm_channels:=",
         pwm_channels,
+        " servo_pwm_channels:=",
+        servo_pwm_channels,
+        " servo_sim_topic:=",
+        servo_sim_topic,
     ]
 
     robot_description = Command(xacro_command)
-
+    robot_description = ParameterValue(Command(xacro_command), value_type=str,)
+    
     return [
         Node(
             package="robot_state_publisher",
@@ -76,6 +86,9 @@ def generate_launch_description():
             DeclareLaunchArgument("robot_namespace", default_value="bluerov2"),
             DeclareLaunchArgument("environment", default_value="real"),
             DeclareLaunchArgument("pwm_channels", default_value="0,1,2,3,4,5,6,7"),
+            DeclareLaunchArgument("servo_pwm_channels", default_value="13,15,16",),
+            DeclareLaunchArgument("servo_sim_topic",default_value="/bluerov/controller/servo_setpoints_sim"),
             OpaqueFunction(function=launch_setup),
+
         ]
     )

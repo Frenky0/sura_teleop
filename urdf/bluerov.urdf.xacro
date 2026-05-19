@@ -7,6 +7,12 @@
   <xacro:arg name="stonefish_topic" default="/bluerov/controller/thruster_setpoints_sim"/>
   <xacro:arg name="pwm_channels" default="0,1,2,3,4,5,6,7"/>
   <xacro:arg name="pressure_offset_pa" default="0.0"/>
+  <!-- Servo motor parameters for future use -->
+  <xacro:arg name="servo_sim_topic" default="/bluerov/controller/servo_setpoints_sim"/>
+  <xacro:arg name="servo_pwm_channels" default="12,14,15"/> <!-- Newton Gripper: 12, Zip = 14,Camera = 15 -->
+  
+  <!-- End of servo motor parameters -->
+
 
   <xacro:property name="robot_namespace" value="$(arg robot_namespace)"/>
   <xacro:property name="robot_prefix" value="${robot_namespace}/"/>
@@ -38,6 +44,18 @@
       <param name="inverted">${inverted}</param>
     </joint>
   </xacro:macro>
+<!-- This macro is defined for future use if we want to add servo motors to the ROV. -->
+<xacro:macro name="ros2_control_servo_joint" params="joint_name inverted center_offset_rad">
+    <joint name="${robot_prefix}${joint_name}">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <param name="inverted">${inverted}</param>
+      <param name="center_offset_rad">${center_offset_rad}</param>
+    </joint>
+  </xacro:macro>
+<!-- End of servo joint macro -->
+
+
 
   <link name="${robot_prefix}base_link">
     <visual>
@@ -55,12 +73,6 @@
     joint_name="${robot_prefix}imu_joint"
     xyz="0.05 0.0 -0.05"
     rpy="-1.57 0 0"/>
-
-  <xacro:sensor_mount
-    link_name="${robot_prefix}dvl_link"
-    joint_name="${robot_prefix}dvl_joint"
-    xyz="0.0 -0.23 -0.05"
-    rpy="0.0 0.0 0.0"/>
 
   <!-- camera down -->
   <link name="${robot_prefix}camera_down/camera"/>
@@ -178,6 +190,49 @@
     xyz="-0.112476 -0.220356 -0.013231"
     rpy="1.57 1.57 0.0"/>
 
+  
+  <!-- Newton Gripper -->
+  <link name="${robot_prefix}newton_gripper"/>
+
+  <joint name="${robot_prefix}newton_gripper_joint" type="prismatic">
+    <parent link="${robot_prefix}base_link"/>
+    <child link="${robot_prefix}newton_gripper"/>
+    <origin xyz="0.25 0.0 -0.05" rpy="0.0 0.0 0.0"/>
+    <axis xyz="1 0 0"/>
+    <!-- Limits normalized: da -1.0 a 1.0 -->
+    <limit lower="-1.0" upper="1.0" effort="10.0" velocity="1.0"/>
+  </joint>
+
+  <!-- Servo Zip -->
+  <link name="${robot_prefix}servo_zip"/>
+
+  <joint name="${robot_prefix}servo_zip_joint" type="revolute">
+    <parent link="${robot_prefix}base_link"/>
+    <child link="${robot_prefix}servo_zip"/>
+    <origin xyz="0.1 0.1 -0.05" rpy="0.0 0.0 0.0"/>
+    <axis xyz="0 0 1"/>
+    <!-- Limits in radians (around -90° to +90°) -->
+    <limit lower="0.0" upper="18.85" effort="10.0" velocity="10.0"/>
+  </joint>
+
+
+
+  <!-- Servo CAMERA -->
+  <link name="${robot_prefix}servo_camera"/>
+  <joint name="${robot_prefix}servo_camera_joint" type="revolute">
+    <parent link="${robot_prefix}base_link"/>
+    <child link="${robot_prefix}servo_camera"/>
+    <!-- Modifica xyz e rpy in base a dove vuoi posizionare la telecamera -->
+    <origin xyz="0.1 0.1 -0.05" rpy="0.0 0.0 0.0"/>
+    <axis xyz="0 0 1"/>
+    <!-- Limiti in radianti per un servo 9g: da -90° (-1.5708) a +90° (1.5708) -->
+    <!-- Effort (coppia) e velocity sono abbassati per simulare un micro-servo -->
+    <limit lower="-1.5708" upper="1.5708" effort="0.15" velocity="2.0"/>
+  </joint>
+
+
+  
+
   <ros2_control name="${robot_namespace}_thrusters" type="system">
     <hardware>
       <plugin>sura_hardware_interface/ThrustersSystem</plugin>
@@ -207,14 +262,10 @@
         <param name="sim_imu_topic">/${robot_namespace}/stonefish/sensors/imu</param>
         <param name="sim_magnetometer_topic">/${robot_namespace}/stonefish/sensors/magnetometer</param>
         <param name="sim_pressure_topic">/${robot_namespace}/stonefish/sensors/pressure</param>
-        <param name="sim_dvl_topic">/${robot_namespace}/stonefish/sensors/dvl</param>
-        <param name="sim_dvl_altitude_topic">/${robot_namespace}/stonefish/sensors/dvl/altitude</param>
         <param name="sim_gps_topic">/${robot_namespace}/stonefish/sensors/gps</param>
         <param name="pressure_offset_pa">$(arg pressure_offset_pa)</param>
         <param name="pressure_read_rate_hz">200.0</param>
-        <param name="dvl_read_rate_hz">20.0</param>
         <param name="battery_read_rate_hz">1.0</param>
-        <param name="leak_read_rate_hz">1.0</param>
       </hardware>
 
       <sensor name="imu_sensor">
@@ -245,28 +296,23 @@
         <state_interface name="current"/>
         <state_interface name="present"/>
       </sensor>
-
-      <sensor name="leak_sensor">
-        <state_interface name="leak"/>
-      </sensor>
-
-      <sensor name="dvl_sensor">
-        <state_interface name="linear_velocity.x"/>
-        <state_interface name="linear_velocity.y"/>
-        <state_interface name="linear_velocity.z"/>
-        <state_interface name="angular_velocity.x"/>
-        <state_interface name="angular_velocity.y"/>
-        <state_interface name="angular_velocity.z"/>
-        <state_interface name="distance_z"/>
-        <state_interface name="confidence"/>
-        <state_interface name="gps.latitude"/>
-        <state_interface name="gps.longitude"/>
-        <state_interface name="gps.altitude"/>
-        <state_interface name="gps.valid"/>
-      </sensor>
     </ros2_control>
   </xacro:macro>
 
   <xacro:ros2_control_sensor_system/>
+
+  <ros2_control name="${robot_namespace}_servos" type="system">
+    <hardware>
+      <plugin>sura_hardware_interface/ServoActuatorSystem</plugin>
+      <param name="environment">$(arg environment)</param>
+      <param name="sim_topic">$(arg servo_sim_topic)</param>
+      <param name="pwm_channels">$(arg servo_pwm_channels)</param>
+    </hardware>
+
+    <!-- the order is important: must match the PWM channel order -->
+    <xacro:ros2_control_servo_joint joint_name="newton_gripper_joint" inverted="false" center_offset_rad="0.0"/>
+    <xacro:ros2_control_servo_joint joint_name="servo_zip_joint" inverted="false" center_offset_rad="-0.5"/>
+    <xacro:ros2_control_servo_joint joint_name="servo_camera_joint" inverted="false" center_offset_rad="0.0"/>
+  </ros2_control>
 
 </robot>
