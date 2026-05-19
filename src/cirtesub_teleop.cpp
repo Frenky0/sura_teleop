@@ -114,6 +114,16 @@ public:
     declare_parameter<double>("scales.roll", 1.0);
     declare_parameter<double>("scales.pitch", 1.0);
     declare_parameter<double>("deadzone", 0.05);
+    // Declare parameters for any additional controllers and buttons as needed
+    declare_parameter<std::string>("newton_gripper_controller.command_topic","/cirtesub/controller/newton_gripper_controller/commands");
+    declare_parameter<std::string>("servo_zip_controller.command_topic","/cirtesub/controller/servo_zip_controller/commands");
+    declare_parameter<std::string>("servo_camera_controller.command_topic","/cirtesub/controller/servo_camera_controller/commands");
+    declare_parameter<double>("servo_command_rate", 20.0);
+  declare_parameter<double>("servo_step", 0.1);
+
+
+
+
 
     rate_ = get_parameter("rate").as_double();
     joy_topic_ = get_parameter("joy_topic").as_string();
@@ -209,6 +219,14 @@ public:
     roll_scale_ = get_parameter("scales.roll").as_double();
     pitch_scale_ = get_parameter("scales.pitch").as_double();
     deadzone_ = std::max(0.0, get_parameter("deadzone").as_double());
+    
+    // Load any additional parameters for new controllers and buttons as needed
+    newton_gripper_command_topic_ = get_parameter("newton_gripper_controller.command_topic").as_string();
+    servo_zip_command_topic_ =  get_parameter("servo_zip_controller.command_topic").as_string();
+    servo_camera_command_topic_ = get_parameter("servo_camera_controller.command_topic").as_string();
+    servo_command_rate_ = get_parameter("servo_command_rate").as_double();
+    servo_step_ = get_parameter("servo_step").as_double();
+    //
 
     if (rate_ <= 0.0) {
       RCLCPP_WARN(get_logger(), "Invalid rate %.3f Hz, using 20.0 Hz.", rate_);
@@ -240,7 +258,14 @@ public:
     alpha_right_forward_velocity_command_pub_ = create_publisher<Float64MultiArrayMsg>(
       alpha_right_forward_velocity_command_topic_,
       rclcpp::SystemDefaultsQoS());
-
+    ///////// Create publishers for any additional controllers as needed
+    newton_gripper_command_pub_ = create_publisher<Float64MultiArrayMsg>(newton_gripper_command_topic_,rclcpp::SystemDefaultsQoS());
+    servo_zip_command_pub_ = create_publisher<Float64MultiArrayMsg>(servo_zip_command_topic_,rclcpp::SystemDefaultsQoS());
+    servo_camera_command_pub_ = create_publisher<Float64MultiArrayMsg>(servo_camera_command_topic_,rclcpp::SystemDefaultsQoS());
+    //////////
+    
+    
+    
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / rate_),
       std::bind(&CirtesubTeleop::timerCallback, this));
@@ -256,6 +281,15 @@ public:
     alpha_forward_timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / alpha_forward_command_rate_),
       std::bind(&CirtesubTeleop::alphaForwardTimerCallback, this));
+    
+    if (servo_command_rate_ <= 0.0) {
+    servo_command_rate_ = 20.0;
+    }
+
+    servo_timer_ = create_wall_timer(
+      std::chrono::duration<double>(1.0 / servo_command_rate_),
+      std::bind(&CirtesubTeleop::servoTimerCallback, this));
+
 
     RCLCPP_INFO(
       get_logger(),
@@ -356,10 +390,20 @@ private:
     const bool lb_pressed = msg->buttons[static_cast<size_t>(lb_button_)] != 0;
     const bool rb_pressed = msg->buttons[static_cast<size_t>(rb_button_)] != 0;
     const bool y_pressed = msg->buttons[static_cast<size_t>(y_button_)] != 0;
+    ///
+    const bool gripper_close_combo_pressed = lb_pressed && a_pressed;
+    const bool gripper_open_combo_pressed = lb_pressed && y_pressed;
+    const bool zip_decrease_combo_pressed = lb_pressed && x_pressed;
+    const bool zip_increase_combo_pressed = lb_pressed && b_pressed;
+    ///
     const bool left_stick_pressed =
       msg->buttons[static_cast<size_t>(left_stick_button_)] != 0;
     const bool right_stick_pressed =
       msg->buttons[static_cast<size_t>(right_stick_button_)] != 0;
+
+
+
+
 
     if (left_stick_pressed && !last_left_stick_button_state_) {
       setTeleopMode(TeleopMode::Arm);
@@ -416,6 +460,15 @@ private:
     } else {
       last_hat_vertical_state_ = 0;
     }
+    ///////
+    processServoCommands(
+      *msg,
+      gripper_close_combo_pressed,
+      gripper_open_combo_pressed,
+      zip_decrease_combo_pressed,
+      zip_increase_combo_pressed);
+    ///////
+
 
     last_body_velocity_combo_state_ = body_velocity_combo_pressed;
     last_position_hold_combo_state_ = position_hold_combo_pressed;
@@ -545,6 +598,84 @@ private:
       alpha_right_forward_velocity_command_pub_->publish(command_msg);
     }
   }
+  void servoTimerCallback()
+  {
+    publishServoCommand(newton_gripper_command_pub_, newton_gripper_command_);
+    publishServoCommand(servo_zip_command_pub_, servo_zip_command_);
+    publishServoCommand(servo_camera_command_pub_, servo_camera_command_);
+  }
+
+  void publishServoCommand(
+    const rclcpp::Publisher<Float64MultiArrayMsg>::SharedPtr & publisher,
+    double command)
+  {
+    if (!publisher) {
+      return;
+    }
+
+    Float64MultiArrayMsg msg;
+    msg.data = {command};
+    publisher->publish(msg);
+  }
+  //
+  void processServoCommands(
+  const JoyMsg & msg,
+  bool gripper_close_pressed,
+  bool gripper_open_pressed,
+  bool zip_decrease_pressed,
+  bool zip_increase_pressed)
+  {
+    if (gripper_close_pressed && !last_gripper_close_combo_state_) {
+      newton_gripper_command_ = -1.0;
+    }
+
+    if (gripper_open_pressed && !last_gripper_open_combo_state_) {
+      newton_gripper_command_ = 1.0;
+    }
+
+    if (zip_decrease_pressed && !last_zip_decrease_combo_state_) {
+      servo_zip_command_ = clampServoCommand(servo_zip_command_ - servo_step_);
+    }
+
+    if (zip_increase_pressed && !last_zip_increase_combo_state_) {
+      servo_zip_command_ = clampServoCommand(servo_zip_command_ + servo_step_);
+    }
+    //////
+    const bool lb_pressed =
+    isValidButtonIndex(msg.buttons, lb_button_) &&
+    msg.buttons[static_cast<size_t>(lb_button_)] != 0;
+
+    const double hat_horizontal = readAxis(msg.axes, hat_horizontal_axis_);
+    int camera_hat_state = 0;
+    if (hat_horizontal > 0.5) {
+      camera_hat_state = 1;
+    } else if (hat_horizontal < -0.5) {
+      camera_hat_state = -1;
+    }
+
+    if (lb_pressed && camera_hat_state != last_servo_camera_hat_state_) {
+      if (camera_hat_state > 0) {
+        servo_camera_command_ = clampServoCommand(servo_camera_command_ + servo_step_);
+      } else if (camera_hat_state < 0) {
+        servo_camera_command_ = clampServoCommand(servo_camera_command_ - servo_step_);
+      }
+    }
+    //////
+
+    last_gripper_close_combo_state_ = gripper_close_pressed;
+    last_gripper_open_combo_state_ = gripper_open_pressed;
+    last_zip_decrease_combo_state_ = zip_decrease_pressed;
+    last_zip_increase_combo_state_ = zip_increase_pressed;
+    last_servo_camera_hat_state_ = camera_hat_state;
+  }
+
+  //
+  ////////
+    double clampServoCommand(double value) const
+  {
+    return std::clamp(value, -1.0, 1.0);
+  }
+  ///////
 
   using ControllerStateMap = std::unordered_map<std::string, std::string>;
 
@@ -1402,6 +1533,14 @@ private:
   std::string stabilize_disable_roll_pitch_service_name_;
   std::string depth_hold_enable_roll_pitch_service_name_;
   std::string depth_hold_disable_roll_pitch_service_name_;
+  //
+  std::string newton_gripper_command_topic_;
+  std::string servo_zip_command_topic_;
+  std::string servo_camera_command_topic_;
+
+  //
+
+
   double alpha_forward_command_rate_{10.0};
   double body_force_feedforward_gain_x_{20.0};
   double body_force_feedforward_gain_y_{20.0};
@@ -1422,6 +1561,22 @@ private:
   double depth_hold_feedforward_gain_pitch_{20.0};
   double depth_hold_feedforward_gain_yaw_{1.0};
 
+  //
+  double servo_command_rate_{20.0};
+  double servo_step_{0.1};
+  double newton_gripper_command_{0.0};
+  double servo_zip_command_{0.0};
+  double servo_camera_command_{0.0};
+
+
+
+  bool last_gripper_close_combo_state_{false};
+  bool last_gripper_open_combo_state_{false};
+  bool last_zip_decrease_combo_state_{false};
+  bool last_zip_increase_combo_state_{false};
+  int last_servo_camera_hat_state_{0};
+  //
+
   JoyMsg::SharedPtr last_joy_msg_;
   TeleopMode teleop_mode_{TeleopMode::Auv};
   CommandOutputMode command_output_mode_{CommandOutputMode::None};
@@ -1441,6 +1596,15 @@ private:
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr depth_hold_disable_roll_pitch_client_;
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::TimerBase::SharedPtr alpha_forward_timer_;
+
+  //
+  rclcpp::Publisher<Float64MultiArrayMsg>::SharedPtr newton_gripper_command_pub_;
+  rclcpp::Publisher<Float64MultiArrayMsg>::SharedPtr servo_zip_command_pub_;
+  rclcpp::Publisher<Float64MultiArrayMsg>::SharedPtr servo_camera_command_pub_;
+  rclcpp::TimerBase::SharedPtr servo_timer_;
+
+  //
+  
 };
 
 int main(int argc, char ** argv)

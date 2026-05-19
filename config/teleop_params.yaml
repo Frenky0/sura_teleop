@@ -15,6 +15,22 @@ sura_teleop:
       feedforward_gain_pitch: 20.0
       feedforward_gain_yaw: 1.0
 
+    newton_gripper_controller:
+      command_topic: /cirtesub/controller/newton_gripper_controller/commands
+
+    servo_zip_controller:
+      command_topic: /cirtesub/controller/servo_zip_controller/commands
+
+    servo_camera_controller:
+      command_topic: /cirtesub/controller/servo_camera_controller/commands
+
+    servo_command_rate: 20.0
+    servo_step: 0.1
+
+
+
+
+
     body_velocity_controller:
       name: body_velocity
       setpoint_topic: /cirtesub/controller/body_velocity/setpoint
