@@ -627,10 +627,17 @@ private:
   }
   void servoTimerCallback()
   {
+    if (gripper_motion_active_ && std::chrono::steady_clock::now() >= gripper_stop_time_) {
+      newton_gripper_command_ = 0.0;
+      gripper_motion_active_ = false;
+    }
+
     publishServoCommand(newton_gripper_command_pub_, newton_gripper_command_);
     publishServoCommand(servo_zip_command_pub_, servo_zip_command_);
     publishServoCommand(servo_camera_command_pub_, servo_camera_command_);
   }
+
+
 
   void publishServoCommand(
     const rclcpp::Publisher<Float64MultiArrayMsg>::SharedPtr & publisher,
@@ -652,12 +659,21 @@ private:
   bool zip_decrease_pressed,
   bool zip_increase_pressed)
   {
+    const double zip_min_command = 0.0;
+    const double zip_max_command = 1.1;
+    const double zip_step_command = 0.2;
     if (gripper_close_pressed && !last_gripper_close_combo_state_) {
       newton_gripper_command_ = -1.0;
+      gripper_motion_active_ = true;
+      gripper_stop_time_ =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(gripper_motion_ms_);
     }
 
     if (gripper_open_pressed && !last_gripper_open_combo_state_) {
       newton_gripper_command_ = 1.0;
+      gripper_motion_active_ = true;
+      gripper_stop_time_ =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(gripper_motion_ms_);
     }
 
     if (zip_decrease_pressed && !last_zip_decrease_combo_state_) {
@@ -667,7 +683,21 @@ private:
     if (zip_increase_pressed && !last_zip_increase_combo_state_) {
       servo_zip_command_ = clampServoCommand(servo_zip_command_ + servo_step_);
     }
-    //////
+    /////////////////////
+    if (zip_decrease_pressed && !last_zip_decrease_combo_state_) {
+      servo_zip_command_ = std::clamp(
+        servo_zip_command_ - zip_step_command,
+        zip_min_command,
+        zip_max_command);
+    }
+
+    if (zip_increase_pressed && !last_zip_increase_combo_state_) {
+      servo_zip_command_ = std::clamp(
+        servo_zip_command_ + zip_step_command,
+        zip_min_command,
+        zip_max_command);
+    }
+    //////////////////
     const bool lb_pressed =
     isValidButtonIndex(msg.buttons, lb_button_) &&
     msg.buttons[static_cast<size_t>(lb_button_)] != 0;
@@ -1684,6 +1714,9 @@ private:
   double newton_gripper_command_{0.0};
   double servo_zip_command_{0.0};
   double servo_camera_command_{0.0};
+  int gripper_motion_ms_{350}; // change and gripper speed changes
+  bool gripper_motion_active_{false};
+  std::chrono::steady_clock::time_point gripper_stop_time_{};
 
 
 
