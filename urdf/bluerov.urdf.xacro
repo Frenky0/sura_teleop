@@ -311,7 +311,7 @@
 
     <!-- the order is important: must match the PWM channel order -->
     <xacro:ros2_control_servo_joint joint_name="newton_gripper_joint" inverted="false" center_offset_rad="0.0"/>
-    <xacro:ros2_control_servo_joint joint_name="servo_zip_joint" inverted="false" center_offset_rad="-0.5"/>
+    <xacro:ros2_control_servo_joint joint_name="servo_zip_joint" inverted="false" center_offset_rad="0.0"/>
     <xacro:ros2_control_servo_joint joint_name="servo_camera_joint" inverted="false" center_offset_rad="0.0"/>
   </ros2_control>
 
