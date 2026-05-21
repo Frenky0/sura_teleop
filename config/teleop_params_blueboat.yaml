@@ -1,0 +1,45 @@
+blueboat_teleop:
+  ros__parameters:
+    joy_topic: /joy
+    cmd_vel_topic: /sura/catamaran/cmd_vel
+    body_force_topic: /sura/catamaran/body_force/command
+
+    publish_rate: 20.0
+    command_timeout: 0.5
+
+    axis_linear_x: 1
+    axis_angular_z: 3
+
+    scale_linear_x: 0.35
+    scale_angular_z: 0.3
+    turbo_scale_linear_x: 0.35
+    turbo_scale_angular_z: 0.3
+    scale_force_x: 12.0
+    scale_torque_z: 3.0
+    turbo_scale_force_x: 18.0
+    turbo_scale_torque_z: 4.5
+    force_filter_alpha: 0.25
+    max_force_rate_x: 24.0
+    max_torque_rate_z: 6.0
+
+    enable_button: -1
+    turbo_button: -1
+    require_enable_button: false
+
+    mode_modifier_button: 5
+    alternate_mode_modifier_button: -1
+    body_force_button: 4
+    body_velocity_button: 2
+    body_position_button: 0
+
+    controller_manager_name: /sura/controller/controller_manager
+    body_force_controller_name: body_force_controller
+    body_velocity_controller_name: body_velocity_controller
+    body_position_controller_name: body_position_controller
+    thruster_test_controller_name: thruster_test_controller
+    navigator_topic: /sura/navigator/navigation
+    position_setpoint_topic: /sura/catamaran/body_position/setpoint
+
+    axis_deadzone: 0.2
+    invert_linear_x: false
+    invert_angular_z: false

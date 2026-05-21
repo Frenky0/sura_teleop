@@ -1,40 +1,63 @@
+import os
+from pathlib import Path
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
-import os
-from pathlib import Path
 
 
-def namespaced_config(config_file, robot_namespace):
+def namespaced_config(config_file, robot_namespace, node_name):
     text = Path(config_file).read_text(encoding="utf-8")
     if robot_namespace:
-        text = text.replace("sura_teleop:", f"/{robot_namespace}/sura_teleop:", 1)
+        text = text.replace(f"{node_name}:", f"/{robot_namespace}/{node_name}:", 1)
         text = text.replace("/sura/", f"/{robot_namespace}/")
 
-    output_file = f"/tmp/sura_teleop_{robot_namespace or 'root'}_{Path(config_file).name}"
+    output_file = f"/tmp/sura_teleop_{robot_namespace or 'root'}_{node_name}_{Path(config_file).name}"
     Path(output_file).write_text(text, encoding="utf-8")
     return output_file
 
 
-def config_for_namespace(package_share, robot_namespace):
-    namespace = robot_namespace.lower()
-    config_name = (
-        "teleop_params_bluerov.yaml"
-        if "bluerov" in namespace
-        else "teleop_params_cirtesub.yaml"
-    )
-    return os.path.join(package_share, "config", config_name)
+def resolve_robot_model(robot_model, robot_namespace):
+    if robot_model and robot_model != "auto":
+        return robot_model.lower()
+    return robot_namespace.lower()
+
+
+def teleop_spec(package_share, robot_model):
+    if robot_model in ("blueboat", "surface", "catamaran", "usv"):
+        return {
+            "executable": "blueboat_teleop",
+            "node_name": "blueboat_teleop",
+            "config": os.path.join(package_share, "config", "teleop_params_blueboat.yaml"),
+        }
+    if robot_model == "bluerov":
+        return {
+            "executable": "cirtesub_teleop",
+            "node_name": "sura_teleop",
+            "config": os.path.join(package_share, "config", "teleop_params_bluerov.yaml"),
+        }
+    return {
+        "executable": "cirtesub_teleop",
+        "node_name": "sura_teleop",
+        "config": os.path.join(package_share, "config", "teleop_params_cirtesub.yaml"),
+    }
 
 
 def launch_setup(context, *args, **kwargs):
     robot_namespace = LaunchConfiguration("robot_namespace").perform(context).strip("/")
-    package_share = get_package_share_directory("sura_teleop")
-    params_file = namespaced_config(
-        config_for_namespace(package_share, robot_namespace),
+    robot_model = resolve_robot_model(
+        LaunchConfiguration("robot_model").perform(context).strip(),
         robot_namespace,
     )
+    package_share = get_package_share_directory("sura_teleop")
+    teleop = teleop_spec(package_share, robot_model)
+
+    config_file = LaunchConfiguration("config_file").perform(context).strip()
+    if not config_file:
+        config_file = teleop["config"]
+    params_file = namespaced_config(config_file, robot_namespace, teleop["node_name"])
 
     joy_node = Node(
         package="joy",
@@ -42,7 +65,7 @@ def launch_setup(context, *args, **kwargs):
         name="joy_node",
         output="screen",
         parameters=[{
-            "device_id": 0,
+            "device_id": int(LaunchConfiguration("joy_device_id").perform(context)),
             "deadzone": 0.05,
             "autorepeat_rate": 20.0,
         }],
@@ -50,8 +73,8 @@ def launch_setup(context, *args, **kwargs):
 
     teleop_node = Node(
         package="sura_teleop",
-        executable="cirtesub_teleop",
-        name="sura_teleop",
+        executable=teleop["executable"],
+        name=teleop["node_name"],
         namespace=robot_namespace,
         output="screen",
         parameters=[params_file],
@@ -66,5 +89,8 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("robot_namespace", default_value="sura"),
+        DeclareLaunchArgument("robot_model", default_value="auto"),
+        DeclareLaunchArgument("config_file", default_value=""),
+        DeclareLaunchArgument("joy_device_id", default_value="0"),
         OpaqueFunction(function=launch_setup),
     ])

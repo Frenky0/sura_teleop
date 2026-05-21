@@ -13,9 +13,14 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(sura_msgs REQUIRED)
 
 add_executable(cirtesub_teleop
   src/cirtesub_teleop.cpp
+)
+
+add_executable(blueboat_teleop
+  src/blueboat_teleop.cpp
 )
 
 ament_target_dependencies(cirtesub_teleop
@@ -28,8 +33,16 @@ ament_target_dependencies(cirtesub_teleop
   std_srvs
 )
 
+ament_target_dependencies(blueboat_teleop
+  controller_manager_msgs
+  geometry_msgs
+  rclcpp
+  sensor_msgs
+  sura_msgs
+)
+
 install(
-  TARGETS cirtesub_teleop
+  TARGETS cirtesub_teleop blueboat_teleop
   DESTINATION lib/${PROJECT_NAME}
 )
 
