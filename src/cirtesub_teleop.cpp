@@ -88,6 +88,12 @@ public:
     declare_parameter<int>("buttons.right_stick", 10);
     declare_parameter<int>("axes.hat_horizontal", 6);
     declare_parameter<int>("axes.hat_vertical", 7);
+
+    /// added new buttons for gripper and servo control
+    declare_parameter<int>("buttons.back", 6);
+    declare_parameter<int>("buttons.start", 7);
+    ////
+
     declare_parameter<int>("axes.surge", 1);
     declare_parameter<int>("axes.sway", 0);
     declare_parameter<int>("axes.yaw", 3);
@@ -114,6 +120,19 @@ public:
     declare_parameter<double>("scales.roll", 1.0);
     declare_parameter<double>("scales.pitch", 1.0);
     declare_parameter<double>("deadzone", 0.05);
+    
+    
+    // Declare parameters for any additional controllers and buttons as needed
+    declare_parameter<std::string>("newton_gripper_controller.command_topic","/cirtesub/controller/newton_gripper_controller/commands");
+    declare_parameter<std::string>("servo_zip_controller.command_topic","/cirtesub/controller/servo_zip_controller/commands");
+    declare_parameter<std::string>("servo_camera_controller.command_topic","/cirtesub/controller/servo_camera_controller/commands");
+    declare_parameter<double>("servo_command_rate", 20.0);
+    declare_parameter<double>("servo_step", 0.1);
+    declare_parameter<std::string>("newton_gripper_controller.name", "newton_gripper_controller");
+    declare_parameter<std::string>("servo_zip_controller.name", "servo_zip_controller");
+    declare_parameter<std::string>("servo_camera_controller.name", "servo_camera_controller");
+    //////////////
+
 
     rate_ = get_parameter("rate").as_double();
     joy_topic_ = get_parameter("joy_topic").as_string();
@@ -210,6 +229,17 @@ public:
     pitch_scale_ = get_parameter("scales.pitch").as_double();
     deadzone_ = std::max(0.0, get_parameter("deadzone").as_double());
 
+    //////////////////
+    newton_gripper_controller_name_ = get_parameter("newton_gripper_controller.name").as_string();
+    servo_zip_controller_name_ = get_parameter("servo_zip_controller.name").as_string();
+    servo_camera_controller_name_ = get_parameter("servo_camera_controller.name").as_string();
+    newton_gripper_command_topic_ = get_parameter("newton_gripper_controller.command_topic").as_string();
+    servo_zip_command_topic_ = get_parameter("servo_zip_controller.command_topic").as_string();
+    servo_camera_command_topic_ = get_parameter("servo_camera_controller.command_topic").as_string();
+    servo_command_rate_ = get_parameter("servo_command_rate").as_double();
+    servo_step_ = get_parameter("servo_step").as_double();
+
+
     if (rate_ <= 0.0) {
       RCLCPP_WARN(get_logger(), "Invalid rate %.3f Hz, using 20.0 Hz.", rate_);
       rate_ = 20.0;
@@ -241,6 +271,12 @@ public:
       alpha_right_forward_velocity_command_topic_,
       rclcpp::SystemDefaultsQoS());
 
+    ///////// Create publishers for any additional controllers as needed
+    newton_gripper_command_pub_ = create_publisher<Float64MultiArrayMsg>(newton_gripper_command_topic_,rclcpp::SystemDefaultsQoS());
+    servo_zip_command_pub_ = create_publisher<Float64MultiArrayMsg>(servo_zip_command_topic_,rclcpp::SystemDefaultsQoS());
+    servo_camera_command_pub_ = create_publisher<Float64MultiArrayMsg>(servo_camera_command_topic_,rclcpp::SystemDefaultsQoS());
+    //////////
+
     timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / rate_),
       std::bind(&CirtesubTeleop::timerCallback, this));
@@ -256,6 +292,14 @@ public:
     alpha_forward_timer_ = create_wall_timer(
       std::chrono::duration<double>(1.0 / alpha_forward_command_rate_),
       std::bind(&CirtesubTeleop::alphaForwardTimerCallback, this));
+
+    if (servo_command_rate_ <= 0.0) {
+      servo_command_rate_ = 20.0;
+    }
+
+    servo_timer_ = create_wall_timer(
+      std::chrono::duration<double>(1.0 / servo_command_rate_),
+      std::bind(&CirtesubTeleop::servoTimerCallback, this));
 
     RCLCPP_INFO(
       get_logger(),
@@ -340,7 +384,9 @@ private:
       !isValidButtonIndex(msg->buttons, rb_button_) ||
       !isValidButtonIndex(msg->buttons, y_button_) ||
       !isValidButtonIndex(msg->buttons, left_stick_button_) ||
-      !isValidButtonIndex(msg->buttons, right_stick_button_))
+      !isValidButtonIndex(msg->buttons, right_stick_button_) ||
+      !isValidButtonIndex(msg->buttons, back_button_) ||
+      !isValidButtonIndex(msg->buttons, start_button_))
     {
       RCLCPP_WARN_THROTTLE(
         get_logger(),
@@ -356,10 +402,23 @@ private:
     const bool lb_pressed = msg->buttons[static_cast<size_t>(lb_button_)] != 0;
     const bool rb_pressed = msg->buttons[static_cast<size_t>(rb_button_)] != 0;
     const bool y_pressed = msg->buttons[static_cast<size_t>(y_button_)] != 0;
+    ////
+    const bool back_pressed = msg->buttons[static_cast<size_t>(back_button_)] != 0;
+    const bool start_pressed = msg->buttons[static_cast<size_t>(start_button_)] != 0;
+    ////
+    const bool gripper_close_combo_pressed = lb_pressed && a_pressed;
+    const bool gripper_open_combo_pressed = lb_pressed && y_pressed;
+    const bool zip_decrease_combo_pressed = lb_pressed && x_pressed;
+    const bool zip_increase_combo_pressed = lb_pressed && b_pressed;
+    ///
     const bool left_stick_pressed =
       msg->buttons[static_cast<size_t>(left_stick_button_)] != 0;
     const bool right_stick_pressed =
       msg->buttons[static_cast<size_t>(right_stick_button_)] != 0;
+
+
+
+
 
     if (left_stick_pressed && !last_left_stick_button_state_) {
       setTeleopMode(TeleopMode::Arm);
@@ -374,6 +433,7 @@ private:
     const bool stabilize_combo_pressed = rb_pressed && y_pressed;
     const bool depth_hold_combo_pressed = rb_pressed && a_pressed;
     const bool body_force_combo_pressed = rb_pressed && lb_pressed;
+    const bool servo_controllers_combo_pressed = back_pressed && start_pressed;    
 
     if (teleop_mode_ == TeleopMode::Auv &&
       body_velocity_combo_pressed && !last_body_velocity_combo_state_)
@@ -404,6 +464,11 @@ private:
     {
       requestBodyForceToggle();
     }
+    ////
+    if (servo_controllers_combo_pressed && !last_servo_controllers_combo_state_) {
+      requestServoControllersToggle();
+    }
+    ////
 
     if (teleop_mode_ == TeleopMode::Arm) {
       processAlphaForwardControllerSelection(*msg, rb_pressed);
@@ -416,12 +481,24 @@ private:
     } else {
       last_hat_vertical_state_ = 0;
     }
+    
+    ///////
+    processServoCommands(
+      *msg,
+      gripper_close_combo_pressed,
+      gripper_open_combo_pressed,
+      zip_decrease_combo_pressed,
+      zip_increase_combo_pressed);
+    ///////
 
     last_body_velocity_combo_state_ = body_velocity_combo_pressed;
     last_position_hold_combo_state_ = position_hold_combo_pressed;
     last_stabilize_combo_state_ = stabilize_combo_pressed;
     last_depth_hold_combo_state_ = depth_hold_combo_pressed;
     last_body_force_combo_state_ = body_force_combo_pressed;
+    //
+    last_servo_controllers_combo_state_ = servo_controllers_combo_pressed;
+    //
     last_left_stick_button_state_ = left_stick_pressed;
     last_right_stick_button_state_ = right_stick_pressed;
   }
@@ -508,6 +585,8 @@ private:
     }
   }
 
+
+
   void alphaForwardTimerCallback()
   {
     if (teleop_mode_ != TeleopMode::Arm) {
@@ -545,6 +624,99 @@ private:
       alpha_right_forward_velocity_command_pub_->publish(command_msg);
     }
   }
+
+
+  void servoTimerCallback()
+  {
+    if (gripper_motion_active_ && std::chrono::steady_clock::now() >= gripper_stop_time_) {
+      newton_gripper_command_ = 0.0;
+      gripper_motion_active_ = false;
+    }
+
+    publishServoCommand(newton_gripper_command_pub_, newton_gripper_command_);
+    publishServoCommand(servo_zip_command_pub_, servo_zip_command_);
+    publishServoCommand(servo_camera_command_pub_, servo_camera_command_);
+  }
+
+
+
+
+  void publishServoCommand(
+    const rclcpp::Publisher<Float64MultiArrayMsg>::SharedPtr & publisher,
+    double command)
+  {
+    if (!publisher) {
+      return;
+    }
+
+    Float64MultiArrayMsg msg;
+    msg.data = {command};
+    publisher->publish(msg);
+  }
+  //
+  void processServoCommands(
+  const JoyMsg & msg,
+  bool gripper_close_pressed,
+  bool gripper_open_pressed,
+  bool zip_decrease_pressed,
+  bool zip_increase_pressed)
+  {
+    if (gripper_close_pressed && !last_gripper_close_combo_state_) {
+      newton_gripper_command_ = -1.0;
+      gripper_motion_active_ = true;
+      gripper_stop_time_ =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(gripper_motion_ms_);
+    }
+
+    if (gripper_open_pressed && !last_gripper_open_combo_state_) {
+      newton_gripper_command_ = 1.0;
+      gripper_motion_active_ = true;
+      gripper_stop_time_ =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(gripper_motion_ms_);
+    }
+
+    if (zip_decrease_pressed && !last_zip_decrease_combo_state_) {
+      servo_zip_command_ = clampServoCommand(servo_zip_command_ - servo_step_);
+    }
+
+    if (zip_increase_pressed && !last_zip_increase_combo_state_) {
+      servo_zip_command_ = clampServoCommand(servo_zip_command_ + servo_step_);
+    }
+    const bool lb_pressed =
+    isValidButtonIndex(msg.buttons, lb_button_) &&
+    msg.buttons[static_cast<size_t>(lb_button_)] != 0;
+
+    const double hat_horizontal = readAxis(msg.axes, hat_horizontal_axis_);
+    int camera_hat_state = 0;
+    if (hat_horizontal > 0.5) {
+      camera_hat_state = 1;
+    } else if (hat_horizontal < -0.5) {
+      camera_hat_state = -1;
+    }
+
+    if (lb_pressed && camera_hat_state != last_servo_camera_hat_state_) {
+      if (camera_hat_state > 0) {
+        servo_camera_command_ = clampServoCommand(servo_camera_command_ + servo_step_);
+      } else if (camera_hat_state < 0) {
+        servo_camera_command_ = clampServoCommand(servo_camera_command_ - servo_step_);
+      }
+    }
+    //////
+
+    last_gripper_close_combo_state_ = gripper_close_pressed;
+    last_gripper_open_combo_state_ = gripper_open_pressed;
+    last_zip_decrease_combo_state_ = zip_decrease_pressed;
+    last_zip_increase_combo_state_ = zip_increase_pressed;
+    last_servo_camera_hat_state_ = camera_hat_state;
+  }
+
+  //
+  ////////
+    double clampServoCommand(double value) const
+  {
+    return std::clamp(value, -1.0, 1.0);
+  }
+  ///////
 
   using ControllerStateMap = std::unordered_map<std::string, std::string>;
 
@@ -1055,7 +1227,79 @@ private:
           body_force_enabled_ ? "activated" : "deactivated");
       });
   }
+  /////////////////////////////////////////////////////////////
+  void requestServoControllersToggle()
+  {
+    if (switch_in_progress_) {
+      RCLCPP_WARN(
+        get_logger(),
+        "Ignoring servo controllers toggle request because a switch is already in progress.");
+      return;
+    }
 
+    if (!list_controllers_client_->wait_for_service(std::chrono::milliseconds(200))) {
+      RCLCPP_WARN(
+        get_logger(),
+        "Controller list service '%s' is not available.",
+        controller_list_service_.c_str());
+      return;
+    }
+
+    switch_in_progress_ = true;
+    auto request = std::make_shared<ListControllersSrv::Request>();
+    const auto future = list_controllers_client_->async_send_request(
+      request,
+      [this](rclcpp::Client<ListControllersSrv>::SharedFuture future_response)
+      {
+        switch_in_progress_ = false;
+
+        ControllerStateMap controller_states;
+        for (const auto & controller : future_response.get()->controller) {
+          controller_states[controller.name] = controller.state;
+        }
+
+        const std::vector<std::string> servo_controllers = {
+          newton_gripper_controller_name_,
+          servo_zip_controller_name_,
+          servo_camera_controller_name_};
+
+        const bool all_active = std::all_of(
+          servo_controllers.begin(),
+          servo_controllers.end(),
+          [this, &controller_states](const std::string & controller_name) {
+            return isControllerActive(controller_states, controller_name);
+          });
+
+        if (all_active) {
+          sendSwitchRequest(
+            {},
+            servo_controllers,
+            [this](rclcpp::Client<SwitchControllerSrv>::SharedFuture switch_future)
+            {
+              if (!switch_future.get()->ok) {
+                RCLCPP_ERROR(get_logger(), "Failed to deactivate servo controllers.");
+                return;
+              }
+              RCLCPP_INFO(get_logger(), "Servo controllers deactivated.");
+            });
+        } else {
+          sendSwitchRequest(
+            servo_controllers,
+            {},
+            [this](rclcpp::Client<SwitchControllerSrv>::SharedFuture switch_future)
+            {
+              if (!switch_future.get()->ok) {
+                RCLCPP_ERROR(get_logger(), "Failed to activate servo controllers.");
+                return;
+              }
+              RCLCPP_INFO(get_logger(), "Servo controllers activated.");
+            });
+        }
+      });
+
+    (void)future;
+  }
+  /////////////////////////////////////////////////////////////
   void sendSwitchRequest(
     const std::vector<std::string> & activate_controllers,
     const std::vector<std::string> & deactivate_controllers,
@@ -1355,6 +1599,13 @@ private:
   int y_button_{3};
   int left_stick_button_{9};
   int right_stick_button_{10};
+  
+  
+  
+  ////
+  int back_button_{6};
+  int start_button_{7};
+  ////
   int hat_horizontal_axis_{6};
   int hat_vertical_axis_{7};
   int surge_axis_{4};
@@ -1374,6 +1625,10 @@ private:
   bool last_stabilize_combo_state_{false};
   bool last_depth_hold_combo_state_{false};
   bool last_body_force_combo_state_{false};
+  ////
+  bool last_servo_controllers_combo_state_{false};
+  ////
+
   bool last_left_stick_button_state_{false};
   bool last_right_stick_button_state_{false};
   bool switch_in_progress_{false};
@@ -1402,6 +1657,23 @@ private:
   std::string stabilize_disable_roll_pitch_service_name_;
   std::string depth_hold_enable_roll_pitch_service_name_;
   std::string depth_hold_disable_roll_pitch_service_name_;
+
+  ////
+  std::string newton_gripper_controller_name_{"newton_gripper_controller"};
+  std::string servo_zip_controller_name_{"servo_zip_controller"};
+  std::string servo_camera_controller_name_{"servo_camera_controller"};
+  ////
+
+
+
+  //
+  std::string newton_gripper_command_topic_;
+  std::string servo_zip_command_topic_;
+  std::string servo_camera_command_topic_;
+
+  //
+
+
   double alpha_forward_command_rate_{10.0};
   double body_force_feedforward_gain_x_{20.0};
   double body_force_feedforward_gain_y_{20.0};
@@ -1422,6 +1694,25 @@ private:
   double depth_hold_feedforward_gain_pitch_{20.0};
   double depth_hold_feedforward_gain_yaw_{1.0};
 
+  //
+  double servo_command_rate_{20.0};
+  double servo_step_{0.1};
+  double newton_gripper_command_{0.0};
+  double servo_zip_command_{0.0};
+  double servo_camera_command_{0.0};
+  int gripper_motion_ms_{350}; // change and gripper speed changes
+  bool gripper_motion_active_{false};
+  std::chrono::steady_clock::time_point gripper_stop_time_{};
+
+
+
+  bool last_gripper_close_combo_state_{false};
+  bool last_gripper_open_combo_state_{false};
+  bool last_zip_decrease_combo_state_{false};
+  bool last_zip_increase_combo_state_{false};
+  int last_servo_camera_hat_state_{0};
+  //
+
   JoyMsg::SharedPtr last_joy_msg_;
   TeleopMode teleop_mode_{TeleopMode::Auv};
   CommandOutputMode command_output_mode_{CommandOutputMode::None};
@@ -1441,6 +1732,14 @@ private:
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr depth_hold_disable_roll_pitch_client_;
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::TimerBase::SharedPtr alpha_forward_timer_;
+
+  //
+  rclcpp::Publisher<Float64MultiArrayMsg>::SharedPtr newton_gripper_command_pub_;
+  rclcpp::Publisher<Float64MultiArrayMsg>::SharedPtr servo_zip_command_pub_;
+  rclcpp::Publisher<Float64MultiArrayMsg>::SharedPtr servo_camera_command_pub_;
+  rclcpp::TimerBase::SharedPtr servo_timer_;
+
+  //
 };
 
 int main(int argc, char ** argv)
