@@ -128,6 +128,7 @@ public:
     declare_parameter<std::string>("servo_camera_controller.command_topic","/cirtesub/controller/servo_camera_controller/commands");
     declare_parameter<double>("servo_command_rate", 20.0);
     declare_parameter<double>("servo_step", 0.1);
+    declare_parameter<int>("gripper_motion_ms", 5000);
     declare_parameter<std::string>("newton_gripper_controller.name", "newton_gripper_controller");
     declare_parameter<std::string>("servo_zip_controller.name", "servo_zip_controller");
     declare_parameter<std::string>("servo_camera_controller.name", "servo_camera_controller");
@@ -238,7 +239,8 @@ public:
     servo_camera_command_topic_ = get_parameter("servo_camera_controller.command_topic").as_string();
     servo_command_rate_ = get_parameter("servo_command_rate").as_double();
     servo_step_ = get_parameter("servo_step").as_double();
-
+    gripper_motion_ms_ = get_parameter("gripper_motion_ms").as_int();
+    //////////////
 
     if (rate_ <= 0.0) {
       RCLCPP_WARN(get_logger(), "Invalid rate %.3f Hz, using 20.0 Hz.", rate_);
