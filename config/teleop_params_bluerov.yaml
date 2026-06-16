@@ -17,7 +17,7 @@ sura_teleop:
 
     servo_command_rate: 20.0
     servo_step: 0.1
-    gripper_step: 0.333
+    gripper_step: 0.222
     gripper_motion_ms: 5000
 
     
