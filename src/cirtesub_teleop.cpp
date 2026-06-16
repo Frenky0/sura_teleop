@@ -128,6 +128,7 @@ public:
     declare_parameter<std::string>("servo_camera_controller.command_topic","/cirtesub/controller/servo_camera_controller/commands");
     declare_parameter<double>("servo_command_rate", 20.0);
     declare_parameter<double>("servo_step", 0.1);
+    declare_parameter<double>("gripper_step", 0.333);
     declare_parameter<int>("gripper_motion_ms", 5000);
     declare_parameter<std::string>("newton_gripper_controller.name", "newton_gripper_controller");
     declare_parameter<std::string>("servo_zip_controller.name", "servo_zip_controller");
@@ -239,6 +240,7 @@ public:
     servo_camera_command_topic_ = get_parameter("servo_camera_controller.command_topic").as_string();
     servo_command_rate_ = get_parameter("servo_command_rate").as_double();
     servo_step_ = get_parameter("servo_step").as_double();
+    gripper_step_ = get_parameter("gripper_step").as_double();
     gripper_motion_ms_ = get_parameter("gripper_motion_ms").as_int();
     //////////////
 
@@ -628,12 +630,12 @@ private:
   }
 
 
-  void servoTimerCallback()
-  {
-    if (gripper_motion_active_ && std::chrono::steady_clock::now() >= gripper_stop_time_) {
-      newton_gripper_command_ = 0.0;
-      gripper_motion_active_ = false;
-    }
+  // void servoTimerCallback()
+  // {
+  //   if (gripper_motion_active_ && std::chrono::steady_clock::now() >= gripper_stop_time_) {
+  //     newton_gripper_command_ = 0.0;
+  //     gripper_motion_active_ = false;
+  //   }
 
     publishServoCommand(newton_gripper_command_pub_, newton_gripper_command_);
     publishServoCommand(servo_zip_command_pub_, servo_zip_command_);
@@ -664,17 +666,11 @@ private:
   bool zip_increase_pressed)
   {
     if (gripper_close_pressed && !last_gripper_close_combo_state_) {
-      newton_gripper_command_ = -1.0;
-      gripper_motion_active_ = true;
-      gripper_stop_time_ =
-        std::chrono::steady_clock::now() + std::chrono::milliseconds(gripper_motion_ms_);
+  newton_gripper_command_ = clampServoCommand(newton_gripper_command_ - gripper_step_);
     }
 
     if (gripper_open_pressed && !last_gripper_open_combo_state_) {
-      newton_gripper_command_ = 1.0;
-      gripper_motion_active_ = true;
-      gripper_stop_time_ =
-        std::chrono::steady_clock::now() + std::chrono::milliseconds(gripper_motion_ms_);
+      newton_gripper_command_ = clampServoCommand(newton_gripper_command_ + gripper_step_);
     }
 
     if (zip_decrease_pressed && !last_zip_decrease_combo_state_) {
@@ -1699,6 +1695,7 @@ private:
   //
   double servo_command_rate_{20.0};
   double servo_step_{0.1};
+  double gripper_step_{0.333};
   double newton_gripper_command_{0.0};
   double servo_zip_command_{0.0};
   double servo_camera_command_{0.0};
