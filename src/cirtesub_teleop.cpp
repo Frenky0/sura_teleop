@@ -630,13 +630,8 @@ private:
   }
 
 
-  // void servoTimerCallback()
-  // {
-  //   if (gripper_motion_active_ && std::chrono::steady_clock::now() >= gripper_stop_time_) {
-  //     newton_gripper_command_ = 0.0;
-  //     gripper_motion_active_ = false;
-  //   }
-
+  void servoTimerCallback()
+  {
     publishServoCommand(newton_gripper_command_pub_, newton_gripper_command_);
     publishServoCommand(servo_zip_command_pub_, servo_zip_command_);
     publishServoCommand(servo_camera_command_pub_, servo_camera_command_);
@@ -659,14 +654,14 @@ private:
   }
   //
   void processServoCommands(
-  const JoyMsg & msg,
-  bool gripper_close_pressed,
-  bool gripper_open_pressed,
-  bool zip_decrease_pressed,
-  bool zip_increase_pressed)
+    const JoyMsg & msg,
+    bool gripper_close_pressed,
+    bool gripper_open_pressed,
+    bool zip_decrease_pressed,
+    bool zip_increase_pressed)
   {
     if (gripper_close_pressed && !last_gripper_close_combo_state_) {
-  newton_gripper_command_ = clampServoCommand(newton_gripper_command_ - gripper_step_);
+      newton_gripper_command_ = clampServoCommand(newton_gripper_command_ - gripper_step_);
     }
 
     if (gripper_open_pressed && !last_gripper_open_combo_state_) {
