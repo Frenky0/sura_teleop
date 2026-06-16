@@ -78,8 +78,8 @@ sura_teleop:
 
 
     newton_gripper_controller:
-      name: newton_gripper_controller
-      command_topic: /sura/controller/newton_gripper_controller/commands
+      name: motor_gripper_controller
+      command_topic: /sura/controller/motor_gripper_controller/commands
 
     servo_zip_controller:
       name: servo_zip_controller
