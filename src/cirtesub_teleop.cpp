@@ -672,12 +672,12 @@ private:
     const bool zip_home_pressed = zip_decrease_pressed && zip_increase_pressed;
     const bool last_zip_home_state =last_zip_decrease_combo_state_ && last_zip_increase_combo_state_;
     if (zip_home_pressed && !last_zip_home_state) {
-      servo_zip_command_ = 0.0;
+      servo_zip_command_ = 1.0;
     } else if (zip_decrease_pressed && !last_zip_decrease_combo_state_) {
-      servo_zip_command_ = -1.0;
+      servo_zip_command_ = -0.67;
     } else if (zip_increase_pressed && !last_zip_increase_combo_state_) {
       servo_zip_command_ = 1.0;
-    } 
+    }
     const bool lb_pressed =
     isValidButtonIndex(msg.buttons, lb_button_) &&
     msg.buttons[static_cast<size_t>(lb_button_)] != 0;
