@@ -128,6 +128,7 @@ public:
     declare_parameter<std::string>("servo_camera_controller.command_topic","/cirtesub/controller/servo_camera_controller/commands");
     declare_parameter<double>("servo_command_rate", 20.0);
     declare_parameter<double>("servo_step", 0.1);
+    declare_parameter<double>("zip_step", 0.333);
     declare_parameter<double>("gripper_step", 0.333);
     declare_parameter<int>("gripper_motion_ms", 5000);
     declare_parameter<std::string>("newton_gripper_controller.name", "newton_gripper_controller");
@@ -240,6 +241,7 @@ public:
     servo_camera_command_topic_ = get_parameter("servo_camera_controller.command_topic").as_string();
     servo_command_rate_ = get_parameter("servo_command_rate").as_double();
     servo_step_ = get_parameter("servo_step").as_double();
+    zip_step_ = get_parameter("zip_step").as_double();
     gripper_step_ = get_parameter("gripper_step").as_double();
     gripper_motion_ms_ = get_parameter("gripper_motion_ms").as_int();
     //////////////
@@ -667,14 +669,15 @@ private:
     if (gripper_open_pressed && !last_gripper_open_combo_state_) {
       newton_gripper_command_ = clampServoCommand(newton_gripper_command_ + gripper_step_);
     }
-
-    if (zip_decrease_pressed && !last_zip_decrease_combo_state_) {
-      servo_zip_command_ = clampServoCommand(servo_zip_command_ - servo_step_);
-    }
-
-    if (zip_increase_pressed && !last_zip_increase_combo_state_) {
-      servo_zip_command_ = clampServoCommand(servo_zip_command_ + servo_step_);
-    }
+    const bool zip_home_pressed = zip_decrease_pressed && zip_increase_pressed;
+    const bool last_zip_home_state =last_zip_decrease_combo_state_ && last_zip_increase_combo_state_;
+    if (zip_home_pressed && !last_zip_home_state) {
+      servo_zip_command_ = 0.0;
+    } else if (zip_decrease_pressed && !last_zip_decrease_combo_state_) {
+      servo_zip_command_ = -1.0;
+    } else if (zip_increase_pressed && !last_zip_increase_combo_state_) {
+      servo_zip_command_ = 1.0;
+    } 
     const bool lb_pressed =
     isValidButtonIndex(msg.buttons, lb_button_) &&
     msg.buttons[static_cast<size_t>(lb_button_)] != 0;
@@ -1690,6 +1693,7 @@ private:
   //
   double servo_command_rate_{20.0};
   double servo_step_{0.1};
+  double zip_step_{0.333};
   double gripper_step_{0.333};
   double newton_gripper_command_{0.0};
   double servo_zip_command_{0.0};
