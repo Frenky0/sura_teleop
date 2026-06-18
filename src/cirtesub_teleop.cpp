@@ -129,6 +129,10 @@ public:
     declare_parameter<double>("servo_command_rate", 20.0);
     declare_parameter<double>("servo_step", 0.1);
     declare_parameter<double>("zip_step", 0.333);
+    declare_parameter<double>("zip_forward_position", 1.0);
+    declare_parameter<double>("zip_hold_position", 0.90);
+    declare_parameter<double>("zip_retract_position", -0.67);
+    declare_parameter<int>("zip_push_time_ms", 600);
     declare_parameter<double>("gripper_step", 0.333);
     declare_parameter<int>("gripper_motion_ms", 5000);
     declare_parameter<std::string>("newton_gripper_controller.name", "newton_gripper_controller");
@@ -242,6 +246,10 @@ public:
     servo_command_rate_ = get_parameter("servo_command_rate").as_double();
     servo_step_ = get_parameter("servo_step").as_double();
     zip_step_ = get_parameter("zip_step").as_double();
+    zip_forward_position_ = get_parameter("zip_forward_position").as_double();
+    zip_hold_position_ = get_parameter("zip_hold_position").as_double();
+    zip_retract_position_ = get_parameter("zip_retract_position").as_double();
+    zip_push_time_ms_ = std::max(0, get_parameter("zip_push_time_ms").as_int());
     gripper_step_ = get_parameter("gripper_step").as_double();
     gripper_motion_ms_ = get_parameter("gripper_motion_ms").as_int();
     //////////////
@@ -634,6 +642,8 @@ private:
 
   void servoTimerCallback()
   {
+    updateZipMotion();
+
     publishServoCommand(newton_gripper_command_pub_, newton_gripper_command_);
     publishServoCommand(servo_zip_command_pub_, servo_zip_command_);
     publishServoCommand(servo_camera_command_pub_, servo_camera_command_);
@@ -670,13 +680,15 @@ private:
       newton_gripper_command_ = clampServoCommand(newton_gripper_command_ + gripper_step_);
     }
     const bool zip_home_pressed = zip_decrease_pressed && zip_increase_pressed;
-    const bool last_zip_home_state =last_zip_decrease_combo_state_ && last_zip_increase_combo_state_;
+    const bool last_zip_home_state =
+      last_zip_decrease_combo_state_ && last_zip_increase_combo_state_;
+
     if (zip_home_pressed && !last_zip_home_state) {
-      servo_zip_command_ = 1.0;
+      startZipPush();
     } else if (zip_decrease_pressed && !last_zip_decrease_combo_state_) {
-      servo_zip_command_ = -0.67;
+      startZipRetract();
     } else if (zip_increase_pressed && !last_zip_increase_combo_state_) {
-      servo_zip_command_ = 1.0;
+      startZipPush();
     }
     const bool lb_pressed =
     isValidButtonIndex(msg.buttons, lb_button_) &&
@@ -708,7 +720,35 @@ private:
 
   //
   ////////
-    double clampServoCommand(double value) const
+  void startZipPush()
+  {
+    servo_zip_command_ = clampServoCommand(zip_forward_position_);
+    zip_push_active_ = true;
+    zip_backoff_time_ =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(zip_push_time_ms_);
+    zip_state_ = ZipState::Pushing;
+  }
+
+  void startZipRetract()
+  {
+    servo_zip_command_ = clampServoCommand(zip_retract_position_);
+    zip_push_active_ = false;
+    zip_state_ = ZipState::Retracted;
+  }
+
+  void updateZipMotion()
+  {
+    if (!zip_push_active_) {
+      return;
+    }
+
+    if (std::chrono::steady_clock::now() >= zip_backoff_time_) {
+      servo_zip_command_ = clampServoCommand(zip_hold_position_);
+      zip_push_active_ = false;
+      zip_state_ = ZipState::Pushed;
+    }
+  }
+  double clampServoCommand(double value) const
   {
     return std::clamp(value, -1.0, 1.0);
   }
@@ -1694,6 +1734,17 @@ private:
   double servo_command_rate_{20.0};
   double servo_step_{0.1};
   double zip_step_{0.333};
+  /////////////////////////////////
+  enum class ZipState { Retracted, Pushing, Pushed };
+
+  double zip_forward_position_{1.0};
+  double zip_hold_position_{0.90};
+  double zip_retract_position_{-0.67};
+  int zip_push_time_ms_{600};
+  bool zip_push_active_{false};
+  std::chrono::steady_clock::time_point zip_backoff_time_{};
+  ZipState zip_state_{ZipState::Retracted};
+  /////////////////////////////////
   double gripper_step_{0.333};
   double newton_gripper_command_{0.0};
   double servo_zip_command_{0.0};
