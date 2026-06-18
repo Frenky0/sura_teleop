@@ -249,7 +249,10 @@ public:
     zip_forward_position_ = get_parameter("zip_forward_position").as_double();
     zip_hold_position_ = get_parameter("zip_hold_position").as_double();
     zip_retract_position_ = get_parameter("zip_retract_position").as_double();
-    zip_push_time_ms_ = std::max(0, get_parameter("zip_push_time_ms").as_int());
+    zip_push_time_ms_ = static_cast<int>(get_parameter("zip_push_time_ms").as_int());
+    if (zip_push_time_ms_ < 0) {
+      zip_push_time_ms_ = 0;
+    }    
     gripper_step_ = get_parameter("gripper_step").as_double();
     gripper_motion_ms_ = get_parameter("gripper_motion_ms").as_int();
     //////////////
