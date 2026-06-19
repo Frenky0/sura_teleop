@@ -135,6 +135,13 @@ public:
     declare_parameter<int>("zip_push_time_ms", 600);
     declare_parameter<double>("gripper_step", 0.333);
     declare_parameter<int>("gripper_motion_ms", 5000);
+    ///
+    declare_parameter<double>("zip_tie_gripper_center_position", -0.55);
+    declare_parameter<double>("zip_tie_gripper_closed_position", -1.0);
+    declare_parameter<double>("zip_tie_gripper_open_position", 1.0);
+    declare_parameter<int>("zip_tie_center_wait_ms", 500);
+    declare_parameter<int>("zip_tie_closed_wait_ms", 700);
+    declare_parameter<int>("zip_tie_open_wait_ms", 700);    ///
     declare_parameter<std::string>("newton_gripper_controller.name", "newton_gripper_controller");
     declare_parameter<std::string>("servo_zip_controller.name", "servo_zip_controller");
     declare_parameter<std::string>("servo_camera_controller.name", "servo_camera_controller");
@@ -256,7 +263,13 @@ public:
     gripper_step_ = get_parameter("gripper_step").as_double();
     gripper_motion_ms_ = get_parameter("gripper_motion_ms").as_int();
     //////////////
-
+    zip_tie_gripper_center_position_ = get_parameter("zip_tie_gripper_center_position").as_double();
+    zip_tie_gripper_closed_position_ = get_parameter("zip_tie_gripper_closed_position").as_double();
+    zip_tie_gripper_open_position_ = get_parameter("zip_tie_gripper_open_position").as_double();
+    zip_tie_center_wait_ms_ = get_parameter("zip_tie_center_wait_ms").as_int();
+    zip_tie_closed_wait_ms_ = get_parameter("zip_tie_closed_wait_ms").as_int();
+    zip_tie_open_wait_ms_ = get_parameter("zip_tie_open_wait_ms").as_int();
+    ///
     if (rate_ <= 0.0) {
       RCLCPP_WARN(get_logger(), "Invalid rate %.3f Hz, using 20.0 Hz.", rate_);
       rate_ = 20.0;
@@ -427,6 +440,9 @@ private:
     const bool gripper_open_combo_pressed = lb_pressed && y_pressed;
     const bool zip_decrease_combo_pressed = lb_pressed && x_pressed;
     const bool zip_increase_combo_pressed = lb_pressed && b_pressed;
+    /// Automatic gripper and zip tie control based on button combinations
+    const bool zip_tie_auto_combo_pressed = lb_pressed && start_pressed;
+
     ///
     const bool left_stick_pressed =
       msg->buttons[static_cast<size_t>(left_stick_button_)] != 0;
@@ -485,6 +501,11 @@ private:
     if (servo_controllers_combo_pressed && !last_servo_controllers_combo_state_) {
       requestServoControllersToggle();
     }
+    //// automatic
+    if (zip_tie_auto_combo_pressed && !last_zip_tie_auto_combo_state_) {
+      requestZipTieAutomationStart();
+    }
+
     ////
 
     if (teleop_mode_ == TeleopMode::Arm) {
@@ -518,6 +539,7 @@ private:
     //
     last_left_stick_button_state_ = left_stick_pressed;
     last_right_stick_button_state_ = right_stick_pressed;
+    last_zip_tie_auto_combo_state_ = zip_tie_auto_combo_pressed;
   }
 
   void timerCallback()
@@ -646,12 +668,12 @@ private:
   void servoTimerCallback()
   {
     updateZipMotion();
+    updateZipTieAutomation();
 
     publishServoCommand(newton_gripper_command_pub_, newton_gripper_command_);
     publishServoCommand(servo_zip_command_pub_, servo_zip_command_);
     publishServoCommand(servo_camera_command_pub_, servo_camera_command_);
   }
-
 
 
 
@@ -751,6 +773,61 @@ private:
       zip_state_ = ZipState::Pushed;
     }
   }
+  /// automatic
+  void requestZipTieAutomationStart()
+  {
+    if (zip_tie_auto_state_ != ZipTieAutoState::Idle) {
+      RCLCPP_WARN(get_logger(), "Zip tie automation already running.");
+      return;
+    }
+
+    requestControllerStates(
+      [this](const ControllerStateMap & controller_states)
+      {
+        const bool gripper_active =
+          isControllerActive(controller_states, newton_gripper_controller_name_);
+        const bool zip_active =
+          isControllerActive(controller_states, servo_zip_controller_name_);
+
+        if (!gripper_active || !zip_active) {
+          RCLCPP_WARN(get_logger(), "Zip tie automation blocked: gripper or zip controller not active.");
+          return;
+        }
+
+        zip_tie_auto_state_ = ZipTieAutoState::CenteringGripper;
+        newton_gripper_command_ = clampServoCommand(zip_tie_gripper_center_position_);
+        zip_tie_next_time_ =
+          std::chrono::steady_clock::now() + std::chrono::milliseconds(zip_tie_center_wait_ms_);
+      },
+      "Ignoring zip tie automation request because controller query is already in progress.");
+  }
+
+  void updateZipTieAutomation()
+  {
+    if (zip_tie_auto_state_ == ZipTieAutoState::Idle) {
+      return;
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+
+    if (zip_tie_auto_state_ == ZipTieAutoState::CenteringGripper && now >= zip_tie_next_time_) {
+      startZipPush();
+      zip_tie_auto_state_ = ZipTieAutoState::PushingZip;
+    } else if (zip_tie_auto_state_ == ZipTieAutoState::PushingZip && zip_state_ == ZipState::Pushed) {
+      newton_gripper_command_ = clampServoCommand(zip_tie_gripper_closed_position_);
+      zip_tie_next_time_ = now + std::chrono::milliseconds(zip_tie_closed_wait_ms_);
+      zip_tie_auto_state_ = ZipTieAutoState::ClosingGripper;
+    } else if (zip_tie_auto_state_ == ZipTieAutoState::ClosingGripper && now >= zip_tie_next_time_) {
+      newton_gripper_command_ = clampServoCommand(zip_tie_gripper_open_position_);
+      zip_tie_next_time_ = now + std::chrono::milliseconds(zip_tie_open_wait_ms_);
+      zip_tie_auto_state_ = ZipTieAutoState::OpeningGripper;
+    } else if (zip_tie_auto_state_ == ZipTieAutoState::OpeningGripper && now >= zip_tie_next_time_) {
+      zip_tie_auto_state_ = ZipTieAutoState::Idle;
+      RCLCPP_INFO(get_logger(), "Zip tie automation complete.");
+    }
+  }
+  ///
+
   double clampServoCommand(double value) const
   {
     return std::clamp(value, -1.0, 1.0);
@@ -1755,7 +1832,20 @@ private:
   int gripper_motion_ms_{350}; // change and gripper speed changes
   bool gripper_motion_active_{false};
   std::chrono::steady_clock::time_point gripper_stop_time_{};
+  //// auto
+  enum class ZipTieAutoState { Idle, CenteringGripper, PushingZip, ClosingGripper, OpeningGripper };
 
+  ZipTieAutoState zip_tie_auto_state_{ZipTieAutoState::Idle};
+  std::chrono::steady_clock::time_point zip_tie_next_time_{};
+  bool last_zip_tie_auto_combo_state_{false};
+
+  double zip_tie_gripper_center_position_{-0.55};
+  double zip_tie_gripper_closed_position_{-1.0};
+  double zip_tie_gripper_open_position_{1.0};
+  int zip_tie_center_wait_ms_{500};
+  int zip_tie_closed_wait_ms_{700};
+  int zip_tie_open_wait_ms_{700};
+  ////
 
 
   bool last_gripper_close_combo_state_{false};

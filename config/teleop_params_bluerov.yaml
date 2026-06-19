@@ -20,6 +20,13 @@ sura_teleop:
     gripper_step: 0.222
     gripper_motion_ms: 5000
 
+    zip_tie_gripper_center_position: -0.55
+    zip_tie_gripper_closed_position: -1.0
+    zip_tie_gripper_open_position: 1.0
+    zip_tie_center_wait_ms: 500
+    zip_tie_closed_wait_ms: 700
+    zip_tie_open_wait_ms: 700
+
     
 
     body_velocity_controller:
