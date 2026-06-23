@@ -15,6 +15,26 @@ sura_teleop:
       feedforward_gain_pitch: 20.0
       feedforward_gain_yaw: 2.0
 
+    # 
+    servo_command_rate: 20.0
+    servo_step: 0.1
+    gripper_step: 0.333
+    zip_forward_position: 1.0
+    zip_hold_position: 0.90
+    zip_retract_position: -0.67
+    zip_push_time_ms: 600
+
+    zip_tie_auto_gripper_click_step: 0.333
+    zip_tie_auto_initial_close_clicks: 3.0
+    zip_tie_auto_final_close_clicks: 2.5
+    zip_tie_auto_final_open_clicks: 6.0
+    zip_tie_auto_initial_close_wait_ms: 700
+    zip_tie_auto_zip_push_time_ms: 4300
+    zip_tie_auto_final_close_wait_ms: 700
+    zip_tie_auto_final_open_wait_ms: 700
+    # 
+
+
     body_velocity_controller:
       name: body_velocity
       setpoint_topic: /sura/controller/body_velocity/setpoint
@@ -56,6 +76,8 @@ sura_teleop:
       y: 3
       left_stick: 9
       right_stick: 10
+      back: 6
+      start: 7
 
     axes:
       hat_horizontal: 6
@@ -66,6 +88,19 @@ sura_teleop:
       heave: 1
       roll: 3
       pitch: 4
+
+    
+    newton_gripper_controller:
+      name: motor_gripper_controller
+      command_topic: /sura/controller/motor_gripper_controller/commands
+
+    servo_zip_controller:
+      name: servo_zip_controller
+      command_topic: /sura/controller/servo_zip_controller/commands
+
+    servo_camera_controller:
+      name: servo_camera_controller
+      command_topic: /sura/controller/servo_camera_controller/commands
 
     alpha_left_forward_velocity_controller:
       name: alpha_left_forward_velocity_controller
