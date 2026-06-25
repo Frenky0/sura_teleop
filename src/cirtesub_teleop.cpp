@@ -1867,7 +1867,7 @@ private:
   double zip_tie_auto_final_close_clicks_{2.5};
   double zip_tie_auto_final_open_clicks_{6.0};
   int zip_tie_auto_initial_close_wait_ms_{700};
-  int zip_tie_auto_zip_push_time_ms_{4300};
+  int zip_tie_auto_zip_push_time_ms_{5000};
   int zip_tie_auto_final_close_wait_ms_{700};
   int zip_tie_auto_final_open_wait_ms_{700};
   ////
