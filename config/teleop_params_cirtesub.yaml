@@ -29,7 +29,7 @@ sura_teleop:
     zip_tie_auto_final_close_clicks: 2.5
     zip_tie_auto_final_open_clicks: 6.0
     zip_tie_auto_initial_close_wait_ms: 700
-    zip_tie_auto_zip_push_time_ms: 4300
+    zip_tie_auto_after_zip_wait_ms: 5000
     zip_tie_auto_final_close_wait_ms: 700
     zip_tie_auto_final_open_wait_ms: 700
     # 

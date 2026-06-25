@@ -141,7 +141,7 @@ public:
     declare_parameter<double>("zip_tie_auto_final_close_clicks", 2.5);
     declare_parameter<double>("zip_tie_auto_final_open_clicks", 6.0);
     declare_parameter<int>("zip_tie_auto_initial_close_wait_ms", 700);
-    declare_parameter<int>("zip_tie_auto_zip_push_time_ms", 4300);
+    declare_parameter<int>("zip_tie_auto_zip_push_time_ms", 5000);
     declare_parameter<int>("zip_tie_auto_final_close_wait_ms", 700);
     declare_parameter<int>("zip_tie_auto_final_open_wait_ms", 700);
     declare_parameter<std::string>("newton_gripper_controller.name", "newton_gripper_controller");
@@ -271,8 +271,8 @@ public:
     zip_tie_auto_final_open_clicks_ = std::max(0.0, get_parameter("zip_tie_auto_final_open_clicks").as_double());
     zip_tie_auto_initial_close_wait_ms_ =
       std::max(0, static_cast<int>(get_parameter("zip_tie_auto_initial_close_wait_ms").as_int()));
-    zip_tie_auto_zip_push_time_ms_ =
-      std::max(0, static_cast<int>(get_parameter("zip_tie_auto_zip_push_time_ms").as_int()));
+    zip_tie_auto_after_zip_wait_ms_ =
+      std::max(0, static_cast<int>(get_parameter("zip_tie_auto_after_zip_wait_ms").as_int()));
     zip_tie_auto_final_close_wait_ms_ =
       std::max(0, static_cast<int>(get_parameter("zip_tie_auto_final_close_wait_ms").as_int()));
     zip_tie_auto_final_open_wait_ms_ =
@@ -755,13 +755,12 @@ private:
 
   //
   ////////
-  void startZipPush(int push_time_ms = -1)
+  void startZipPush()
   {
-    const int duration_ms = std::max(0, push_time_ms >= 0 ? push_time_ms : zip_push_time_ms_);
     servo_zip_command_ = clampServoCommand(zip_forward_position_);
     zip_push_active_ = true;
     zip_backoff_time_ =
-      std::chrono::steady_clock::now() + std::chrono::milliseconds(duration_ms);
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(zip_push_time_ms_);
     zip_state_ = ZipState::Pushing;
   }
 
@@ -834,9 +833,12 @@ private:
     const auto now = std::chrono::steady_clock::now();
 
     if (zip_tie_auto_state_ == ZipTieAutoState::InitialClosingGripper && now >= zip_tie_next_time_) {
-      startZipPush(zip_tie_auto_zip_push_time_ms_);
+      startZipPush();
       zip_tie_auto_state_ = ZipTieAutoState::PushingZip;
     } else if (zip_tie_auto_state_ == ZipTieAutoState::PushingZip && zip_state_ == ZipState::Pushed) {
+      scheduleZipTieStep(zip_tie_auto_after_zip_wait_ms_);
+      zip_tie_auto_state_ = ZipTieAutoState::WaitingAfterZip;
+    } else if (zip_tie_auto_state_ == ZipTieAutoState::WaitingAfterZip && now >= zip_tie_next_time_) {
       applyZipTieGripperClicks(-zip_tie_auto_final_close_clicks_);
       scheduleZipTieStep(zip_tie_auto_final_close_wait_ms_);
       zip_tie_auto_state_ = ZipTieAutoState::FinalClosingGripper;
@@ -1856,8 +1858,7 @@ private:
   bool gripper_motion_active_{false};
   std::chrono::steady_clock::time_point gripper_stop_time_{};
   //// auto
-  enum class ZipTieAutoState { Idle, InitialClosingGripper, PushingZip, FinalClosingGripper, OpeningGripper };
-
+  enum class ZipTieAutoState { Idle, InitialClosingGripper, PushingZip, WaitingAfterZip, FinalClosingGripper, OpeningGripper };
   ZipTieAutoState zip_tie_auto_state_{ZipTieAutoState::Idle};
   std::chrono::steady_clock::time_point zip_tie_next_time_{};
   bool last_zip_tie_auto_combo_state_{false};
@@ -1867,7 +1868,7 @@ private:
   double zip_tie_auto_final_close_clicks_{2.5};
   double zip_tie_auto_final_open_clicks_{6.0};
   int zip_tie_auto_initial_close_wait_ms_{700};
-  int zip_tie_auto_zip_push_time_ms_{5000};
+  int zip_tie_auto_after_zip_wait_ms_{5000};  
   int zip_tie_auto_final_close_wait_ms_{700};
   int zip_tie_auto_final_open_wait_ms_{700};
   ////
