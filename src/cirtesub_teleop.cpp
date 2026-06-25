@@ -141,7 +141,7 @@ public:
     declare_parameter<double>("zip_tie_auto_final_close_clicks", 2.5);
     declare_parameter<double>("zip_tie_auto_final_open_clicks", 6.0);
     declare_parameter<int>("zip_tie_auto_initial_close_wait_ms", 700);
-    declare_parameter<int>("zip_tie_auto_zip_push_time_ms", 5000);
+    declare_parameter<int>("zip_tie_auto_after_zip_wait_ms", 5000);
     declare_parameter<int>("zip_tie_auto_final_close_wait_ms", 700);
     declare_parameter<int>("zip_tie_auto_final_open_wait_ms", 700);
     declare_parameter<std::string>("newton_gripper_controller.name", "newton_gripper_controller");
