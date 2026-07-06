@@ -20,8 +20,8 @@ sura_teleop:
     gripper_step: 0.222
     gripper_motion_ms: 5000
     gripper_initial_position: 0.222
-    zip_forward_position: 0.65
-    zip_hold_position: 0.64
+    zip_forward_position: 0.6
+    zip_hold_position: 0.59
     zip_retract_position: -1.0
     zip_push_time_ms: 300
     zip_home_time_ms: 800
