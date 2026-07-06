@@ -259,6 +259,7 @@ public:
     zip_hold_position_ = get_parameter("zip_hold_position").as_double();
     zip_retract_position_ = get_parameter("zip_retract_position").as_double();
     zip_push_time_ms_ = static_cast<int>(get_parameter("zip_push_time_ms").as_int());
+    servo_zip_command_ = clampServoCommand(zip_retract_position_);
     if (zip_push_time_ms_ < 0) {
       zip_push_time_ms_ = 0;
     }    
