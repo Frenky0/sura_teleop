@@ -133,8 +133,10 @@ public:
     declare_parameter<double>("zip_hold_position", 0.90);
     declare_parameter<double>("zip_retract_position", -0.67);
     declare_parameter<int>("zip_push_time_ms", 600);
+    declare_parameter<int>("zip_home_time_ms", 800);
     declare_parameter<double>("gripper_step", 0.333);
     declare_parameter<int>("gripper_motion_ms", 5000);
+    declare_parameter<double>("gripper_initial_position", 0.222);
     ///
     declare_parameter<double>("zip_tie_auto_gripper_click_step", 0.333);
     declare_parameter<double>("zip_tie_auto_initial_close_clicks", 2.2);
@@ -259,12 +261,17 @@ public:
     zip_hold_position_ = get_parameter("zip_hold_position").as_double();
     zip_retract_position_ = get_parameter("zip_retract_position").as_double();
     zip_push_time_ms_ = static_cast<int>(get_parameter("zip_push_time_ms").as_int());
+    zip_home_time_ms_ = static_cast<int>(get_parameter("zip_home_time_ms").as_int());
     servo_zip_command_ = clampServoCommand(zip_retract_position_);
     if (zip_push_time_ms_ < 0) {
       zip_push_time_ms_ = 0;
     }    
+    if (zip_home_time_ms_ < 0) {
+      zip_home_time_ms_ = 0;
+    }
     gripper_step_ = get_parameter("gripper_step").as_double();
     gripper_motion_ms_ = get_parameter("gripper_motion_ms").as_int();
+    newton_gripper_command_ = clampServoCommand(get_parameter("gripper_initial_position").as_double());
     //////////////
     zip_tie_auto_gripper_click_step_ = std::fabs(get_parameter("zip_tie_auto_gripper_click_step").as_double());
     zip_tie_auto_initial_close_clicks_ = std::max(0.0, get_parameter("zip_tie_auto_initial_close_clicks").as_double());
@@ -761,11 +768,11 @@ private:
   ////////
   void startZipPush()
   {
-    servo_zip_command_ = clampServoCommand(zip_forward_position_);
+    servo_zip_command_ = clampServoCommand(zip_retract_position_);
     zip_push_active_ = true;
     zip_backoff_time_ =
-      std::chrono::steady_clock::now() + std::chrono::milliseconds(zip_push_time_ms_);
-    zip_state_ = ZipState::Pushing;
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(zip_home_time_ms_);
+    zip_state_ = ZipState::HomingBeforePush;
   }
 
   void startZipRetract()
@@ -782,6 +789,14 @@ private:
     }
 
     if (std::chrono::steady_clock::now() >= zip_backoff_time_) {
+      if (zip_state_ == ZipState::HomingBeforePush) {
+        servo_zip_command_ = clampServoCommand(zip_forward_position_);
+        zip_backoff_time_ =
+          std::chrono::steady_clock::now() + std::chrono::milliseconds(zip_push_time_ms_);
+        zip_state_ = ZipState::Pushing;
+        return;
+      }
+
       servo_zip_command_ = clampServoCommand(zip_hold_position_);
       zip_push_active_ = false;
       zip_state_ = ZipState::Pushed;
@@ -1862,12 +1877,13 @@ private:
   double servo_step_{0.1};
   double zip_step_{0.333};
   /////////////////////////////////
-  enum class ZipState { Retracted, Pushing, Pushed };
+  enum class ZipState { Retracted, HomingBeforePush, Pushing, Pushed };
 
   double zip_forward_position_{1.0};
   double zip_hold_position_{0.90};
   double zip_retract_position_{-0.67};
   int zip_push_time_ms_{600};
+  int zip_home_time_ms_{800};
   bool zip_push_active_{false};
   std::chrono::steady_clock::time_point zip_backoff_time_{};
   ZipState zip_state_{ZipState::Retracted};
